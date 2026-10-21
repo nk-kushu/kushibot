@@ -1,0 +1,3 @@
+import type { WorkflowRunSnapshot } from "./WorkflowRunSnapshot.js";
+import type { PartialProgress } from "../contracts/outcomes/PartialProgress.js";
+export function collectWorkflowPartial(run:WorkflowRunSnapshot):PartialProgress{return Object.freeze({summary:run.accepted.length+" accepted step results retained from "+run.attempts.length+" admitted attempts.",evidenceRefs:Object.freeze(["workflow-run:"+run.runId]),artifactRefs:Object.freeze([]),unresolved:Object.freeze([run.accepted.length===run.definition.steps.length?"Workflow-level goal acceptance is incomplete; inspect saved outcomes, controls and transition state.":run.definition.steps.length-run.accepted.length+" steps remain unaccepted; inspect the retained run record."])});}

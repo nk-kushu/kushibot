@@ -1,0 +1,1 @@
+export type EditingResult = Readonly<{ summary: string; baseSnapshotRef: string; resultSnapshotRef: string; changedPaths: readonly string[]; changeArtifactRefs: readonly string[]; unresolved: readonly string[] }>;

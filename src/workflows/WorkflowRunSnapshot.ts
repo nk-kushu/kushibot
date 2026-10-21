@@ -1,0 +1,24 @@
+import type { OperationReconciliation } from "./recovery/OperationReconciliation.js";
+import type { WorkflowRecoveryRecord } from "./recovery/WorkflowRecoveryRecord.js";
+import type { RecoveryFence } from "./recovery/RecoveryFence.js";
+import type { WorkflowCompletionDecision } from "./WorkflowCompletionDecision.js";
+import type { ExecutionScopeRef } from "../contracts/runtime/ExecutionScopeRef.js";
+import type { RegistrationRef } from "../contracts/RegistrationRef.js";
+import type { JsonValue } from "../contracts/persistence/JsonValue.js";
+import type { ExecutionOutcome } from "../contracts/outcomes/ExecutionOutcome.js";
+import type { LifecycleSnapshot } from "../domain/lifecycle/LifecycleSnapshot.js";
+import type { WorkflowDefinition } from "./WorkflowDefinition.js";
+import type { StepRunSnapshot } from "./StepRunSnapshot.js";
+import type { WorkflowStepAttempt } from "./WorkflowStepAttempt.js";
+import type { AcceptedStepResult } from "./AcceptedStepResult.js";
+import type { WorkflowTransitionRecord } from "./WorkflowTransitionRecord.js";
+import type { WorkflowTransitionPlan } from "./WorkflowTransitionPlan.js";
+import type { WorkflowResult } from "./WorkflowResult.js";
+export type WorkflowRunSnapshot=Readonly<{
+  schemaVersion:2;revision:number;dependencyRevision:number;runId:string;scope:ExecutionScopeRef;
+  definition:WorkflowDefinition;request:JsonValue;completionPolicy:RegistrationRef;budgetScopeId:string;deadlineEpochMs:number|null;
+  reconciliations:readonly OperationReconciliation[];recoveries:readonly WorkflowRecoveryRecord[];recoveryFence:RecoveryFence|null;
+  lifecycle:LifecycleSnapshot;engineOwner:Readonly<{commandId:string;ownerToken:string}>|null;
+  steps:readonly StepRunSnapshot[];attempts:readonly WorkflowStepAttempt[];accepted:readonly AcceptedStepResult[];
+  transitions:readonly WorkflowTransitionRecord[];transitionPlan:WorkflowTransitionPlan|null;completionDecision:WorkflowCompletionDecision|null;outcome:ExecutionOutcome<WorkflowResult>|null;
+}>;

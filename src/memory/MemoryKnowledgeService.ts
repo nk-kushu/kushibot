@@ -1,0 +1,28 @@
+import type { IAgentMemoryStore } from "./IAgentMemoryStore.js";
+import type { IKnowledgeSourceReader } from "./IKnowledgeSourceReader.js";
+import type { IPolicy } from "../contracts/IPolicy.js";
+import type { IClock } from "../contracts/runtime/IClock.js";
+import type { IExecutionContext } from "../executors/contracts/IExecutionContext.js";
+import type { KnowledgeValidationInput } from "./KnowledgeValidationInput.js";
+import type { KnowledgeValidationDecision } from "./KnowledgeValidationDecision.js";
+import type { KnowledgeSourceObservation } from "./KnowledgeSourceObservation.js";
+import type { MemoryRecord } from "./MemoryRecord.js";
+import type { MemoryValidationOutcome } from "./MemoryValidationOutcome.js";
+import { MemoryProposalContract } from "./MemoryProposalContract.js";
+import { MemoryRecordContract } from "./MemoryRecordContract.js";
+import { JsonValueContract } from "../persistence/JsonValueContract.js";
+import { ExecutionBoundaryGuard } from "../execution-control/ExecutionBoundaryGuard.js";
+import { canonicalWorkflowValue as canonical } from "../workflows/canonicalWorkflowValue.js";
+import { AgentMemoryError } from "../errors/AgentMemoryError.js";
+export class MemoryKnowledgeService {
+ constructor(private readonly store:IAgentMemoryStore,private readonly sources:IKnowledgeSourceReader,private readonly policy:IPolicy<KnowledgeValidationInput,KnowledgeValidationDecision>,private readonly proposals:MemoryProposalContract,private readonly records:MemoryRecordContract,private readonly json:JsonValueContract,private readonly clock:IClock){}
+ async propose(value:unknown,context:IExecutionContext):Promise<MemoryRecord>{this.bind(context);const checked=await this.proposals.validate(value);if(!checked.valid||canonical(checked.value.scope)!==canonical(this.store.scope))throw new AgentMemoryError();const guard=new ExecutionBoundaryGuard(this.clock,context.signal,context.deadlineEpochMs);if(guard.check()!==null)throw new AgentMemoryError();const existing=await this.store.get(checked.value.id);if(existing!==null){if(canonical(existing.proposal)!==canonical(checked.value))throw new AgentMemoryError();return existing;}if(guard.check()!==null)throw new AgentMemoryError();const now=this.clock.nowEpochMs();if(checked.value.createdAtEpochMs>now||checked.value.expiresAtEpochMs<=now)throw new AgentMemoryError();return this.store.propose(checked.value);}
+ async validate(id:string,context:IExecutionContext):Promise<MemoryValidationOutcome>{
+  this.bind(context);const record=await this.store.get(id);if(record===null)throw new AgentMemoryError();if(record.decision!==null)return {status:"recorded",record};const guard=new ExecutionBoundaryGuard(this.clock,context.signal,context.deadlineEpochMs);let stop=guard.check();if(stop!==null)return {status:"stopped",reason:stop,record};
+  const checked=await this.json.validate(await this.sources.read(record.proposal.source,context));if(!checked.valid)throw new AgentMemoryError();const observation=checked.value as unknown as KnowledgeSourceObservation;this.observation(observation);
+  stop=guard.check();if(stop!==null)return {status:"stopped",reason:stop,record};const now=this.clock.nowEpochMs(),rawDecision=await this.policy.apply(Object.freeze({proposal:record.proposal,observation,nowEpochMs:now}));const candidate=await this.records.validate({...record,revision:1,decision:rawDecision});if(!candidate.valid||candidate.value.decision===null)throw new AgentMemoryError();const decision=candidate.value.decision;if(decision.status==="rejected"&&decision.checkedAtEpochMs!==now)throw new AgentMemoryError();if(decision.status==="accepted"&&(observation.status!=="current"||canonical(observation.source)!==canonical(record.proposal.source)||observation.text!==record.proposal.statement||decision.verificationRef!==observation.verificationRef||decision.validatedAtEpochMs!==now||decision.validUntilEpochMs>observation.validUntilEpochMs))throw new AgentMemoryError();
+  stop=guard.check();if(stop!==null)return {status:"stopped",reason:stop,record};if(decision.status==="accepted"&&this.clock.nowEpochMs()>=decision.validUntilEpochMs)return {status:"changed",record};const latest=await this.store.get(id);if(latest===null)throw new AgentMemoryError();if(latest.revision!==record.revision)return {status:"changed",record:latest};stop=guard.check();if(stop!==null)return {status:"stopped",reason:stop,record:latest};if(decision.status==="accepted"&&this.clock.nowEpochMs()>=decision.validUntilEpochMs)return {status:"changed",record:latest};return {status:"recorded",record:await this.store.decide(id,record.revision,decision)};
+ }
+ private bind(context:IExecutionContext):void{if(canonical(context.scope)!==canonical(this.store.scope))throw new AgentMemoryError();}
+ private observation(value:KnowledgeSourceObservation):void{if(value===null||typeof value!=="object")throw new AgentMemoryError();const keys=Object.keys(value).sort().join(",");if(value.status!=="current"){if(!["unavailable","changed"].includes(value.status)||keys!=="status")throw new AgentMemoryError();return;}if(keys!==["status","source","text","verificationRef","validUntilEpochMs"].sort().join(",")||value.source===null||typeof value.source!=="object"||Object.keys(value.source).sort().join(",")!=="revisionRef,sourceRef"||![value.source.sourceRef,value.source.revisionRef,value.verificationRef].every(v=>typeof v==="string"&&v.trim().length>0&&v.length<=256)||typeof value.text!=="string"||new TextEncoder().encode(value.text).byteLength>8192||!Number.isSafeInteger(value.validUntilEpochMs)||value.validUntilEpochMs<0)throw new AgentMemoryError();}
+}

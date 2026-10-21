@@ -1,0 +1,1 @@
+export class RuntimeAdmissionError extends Error {readonly code="RUNTIME_ADMISSION_CLOSED";constructor(){super("Runtime admission is closed, full, or the execution identity is already active.");this.name="RuntimeAdmissionError";}}

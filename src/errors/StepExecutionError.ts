@@ -1,0 +1,1 @@
+export class StepExecutionError extends Error { readonly code = "STEP_EXECUTION_INVALID"; constructor() { super("Step execution binding, policy output, or journal receipt is invalid."); this.name = "StepExecutionError"; } }

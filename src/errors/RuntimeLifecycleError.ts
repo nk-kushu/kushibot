@@ -1,0 +1,1 @@
+export class RuntimeLifecycleError extends Error {readonly code="RUNTIME_LIFECYCLE_INVALID";constructor(){super("Runtime configuration, resource state, or lifecycle contract is invalid.");this.name="RuntimeLifecycleError";}}

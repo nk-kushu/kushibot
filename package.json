@@ -14,7 +14,12 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:examples": "tsc -p tsconfig.examples.json",
+    "example:shared-policy": "npm run build:examples && node .example-dist/examples/shared-policy/main.js",
+    "example:configuration": "npm run build:examples && node .example-dist/examples/configuration/main.js",
+    "example:lifecycle": "npm run build:examples && node .example-dist/examples/lifecycle/main.js",
+    "test": "tsc -p tsconfig.tests.json && node tests/run-tests.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

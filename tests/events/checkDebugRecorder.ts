@@ -1,0 +1,41 @@
+import { ScopedDebugRecorder } from "../../src/events/ScopedDebugRecorder.js";
+import { LoggingController } from "../../src/events/LoggingController.js";
+import { BoundedDebugPublisher } from "../../src/events/BoundedDebugPublisher.js";
+import { DebugEventFactory } from "../../src/events/DebugEventFactory.js";
+import { DebugPayloadSanitizer } from "../../src/events/DebugPayloadSanitizer.js";
+import { DebugHealthCounter } from "../../src/events/DebugHealthCounter.js";
+import type { DebugEvent } from "../../src/events/DebugEvent.js";
+
+export async function checkDebugRecorder(): Promise<void> {
+  const events: DebugEvent[] = [];
+  const logging = new LoggingController({ enabled: true, level: "debug" });
+  const health = new DebugHealthCounter();
+  const publisher = new BoundedDebugPublisher([{ id: "test", sink: { async send(event) { events.push(event); } } }], 8, 100, health);
+  let id = 0;
+  const ids = { nextId: () => `id-${++id}` };
+  let elapsed = 0;
+  const trace = { traceId: "trace", spanId: "root", parentSpanId: null, causationEventId: null };
+  const factory = new DebugEventFactory({ scopeId: "scope", projectId: "project" }, { operationId: "operation" },
+    "test", { nowEpochMs: () => 1000 }, ids, new DebugPayloadSanitizer());
+  const recorder = new ScopedDebugRecorder(logging, publisher, factory, trace, ids, { nowMs: () => elapsed }, health);
+  const expected = { secret: "must-not-be-logged" };
+  const result = await recorder.operation("inspect", async () => { elapsed += 25; return expected; });
+  if (result !== expected) throw new Error("Callback result changed.");
+  await publisher.drain();
+  if (events.length !== 2 || events[1].payload.durationMs !== 25 || events[1].trace.causationEventId !== events[0].eventId) throw new Error("Span correlation failed.");
+  const original = new Error("private failure details");
+  try { await recorder.operation("inspect", async () => { throw original; }); throw new Error("Missing failure."); }
+  catch (error) { if (error !== original) throw new Error("Original error changed."); }
+  await publisher.drain();
+  recorder.event("progress.reported", "info", { summary: "private message", rawPrompt: "private prompt", password: "secret", count: 1 });
+  await publisher.drain();
+  const payload = events[events.length - 1].payload;
+  if (JSON.stringify(payload) !== '{"count":1}' || JSON.stringify(events).includes("private")) throw new Error("Payload leakage.");
+  logging.setEnabled(false);
+  logging.setLevel("error");
+  const before = events.length;
+  let executed = false;
+  await recorder.operation("inspect", async () => { executed = true; });
+  await publisher.drain();
+  if (!executed || events.length !== before || logging.snapshot().enabled) throw new Error("Disabled recorder changed work or emitted.");
+}

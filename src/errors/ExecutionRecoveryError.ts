@@ -1,0 +1,1 @@
+export class ExecutionRecoveryError extends Error{readonly code="EXECUTION_RECOVERY_INVALID";constructor(){super("Recovery binding, checkpoint, or evidence is invalid.");this.name="ExecutionRecoveryError";}}

@@ -1,0 +1,1 @@
+export type RuntimeReleaseOutcome=Readonly<{status:"released";releasedResourceIds:readonly string[];retainedResourceIds:readonly string[]}>|Readonly<{status:"blocked";code:"RELEASE_FAILED"|"CLEANUP_CONTROL_STOP"|"QUIESCENCE_LOST";failedResourceId:string|null;releasedResourceIds:readonly string[];retainedResourceIds:readonly string[]}>;

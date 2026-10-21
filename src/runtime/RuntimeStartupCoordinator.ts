@@ -1,0 +1,16 @@
+import { RuntimeAdmissionGate } from "./RuntimeAdmissionGate.js";
+import type { IRuntimeInitializer } from "./IRuntimeInitializer.js";
+import type { IRuntimeReadinessCheck } from "./IRuntimeReadinessCheck.js";
+import type { RuntimeStartupOutcome } from "./RuntimeStartupOutcome.js";
+import type { IClock } from "../contracts/runtime/IClock.js";
+import { RuntimeControlScope } from "./RuntimeControlScope.js";
+import { RuntimeResourcePlan } from "./RuntimeResourcePlan.js";
+import { RuntimeConfiguration } from "./RuntimeConfiguration.js";
+import { RuntimeLifecycleError } from "../errors/RuntimeLifecycleError.js";
+export class RuntimeStartupCoordinator {
+ private readonly initializers:readonly IRuntimeInitializer[];private readonly checks:readonly IRuntimeReadinessCheck[];
+ constructor(private readonly config:RuntimeConfiguration,private readonly resources:RuntimeResourcePlan,initializers:readonly IRuntimeInitializer[],checks:readonly IRuntimeReadinessCheck[],private readonly clock:IClock,private readonly admission:RuntimeAdmissionGate){if(initializers.length>16||checks.length>16||[...initializers,...checks].some(v=>!/^[A-Za-z0-9_.:-]{1,128}$/.test(v.id))||new Set([...initializers,...checks].map(v=>v.id)).size!==initializers.length+checks.length)throw new RuntimeLifecycleError();this.initializers=Object.freeze([...initializers]);this.checks=Object.freeze([...checks]);}
+ async start(signal:AbortSignal):Promise<RuntimeStartupOutcome>{const phase=RuntimeControlScope.open(this.clock,this.config.options.startupTimeoutMs,signal);let stepId="startup",code:"STARTUP_CONTROL_STOP"|"STARTUP_STEP_FAILED"="STARTUP_STEP_FAILED";try{for(const binding of this.resources.ordered){stepId=binding.id;if(this.stopped(phase)){code="STARTUP_CONTROL_STOP";throw new RuntimeLifecycleError();}await binding.acquire(phase.control);}for(const initializer of this.initializers){stepId=initializer.id;if(this.stopped(phase)){code="STARTUP_CONTROL_STOP";throw new RuntimeLifecycleError();}await initializer.initialize(phase.control);}for(const check of this.checks){stepId=check.id;if(this.stopped(phase)){code="STARTUP_CONTROL_STOP";throw new RuntimeLifecycleError();}if(!await check.verify(phase.control))throw new RuntimeLifecycleError();}if(this.stopped(phase)){code="STARTUP_CONTROL_STOP";throw new RuntimeLifecycleError();}return {status:"ready",acquiredResourceIds:this.resources.acquiredIds()};}catch{if(this.stopped(phase))code="STARTUP_CONTROL_STOP";}finally{phase.dispose();}const cleanup=RuntimeControlScope.open(this.clock,this.config.options.shutdownTimeoutMs);try{return {status:"failed",code,stepId,cleanup:await this.resources.release(cleanup.control,this.clock,async()=>true)};}finally{cleanup.dispose();}}
+ async cancelReady():Promise<RuntimeStartupOutcome>{if(this.admission.hasOpened())throw new RuntimeLifecycleError();const cleanup=RuntimeControlScope.open(this.clock,this.config.options.shutdownTimeoutMs);try{return {status:"failed",code:"STARTUP_CONTROL_STOP",stepId:"admission",cleanup:await this.resources.release(cleanup.control,this.clock,async()=>true)};}finally{cleanup.dispose();}}
+ private stopped(phase:RuntimeControlScope):boolean{return phase.control.signal.aborted||this.clock.nowEpochMs()>=phase.control.deadlineEpochMs;}
+}

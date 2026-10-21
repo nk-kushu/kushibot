@@ -1,0 +1,1 @@
+export type LoginSpecificationResult = Readonly<{ summary: string; requirements: readonly string[]; acceptanceCriteria: readonly string[]; sourceRefs: readonly string[]; unresolved: readonly string[] }>;

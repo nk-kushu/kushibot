@@ -1,0 +1,1 @@
+export class WorkflowDefinitionError extends Error { readonly code = "WORKFLOW_DEFINITION_INVALID"; constructor() { super("Workflow definition or its registrations are invalid."); this.name = "WorkflowDefinitionError"; } }

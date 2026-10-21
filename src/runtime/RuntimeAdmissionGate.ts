@@ -1,0 +1,2 @@
+import { RuntimeAdmissionError } from "../errors/RuntimeAdmissionError.js";
+export class RuntimeAdmissionGate {private ready=false;private sealed=false;private everOpened=false;open():void{if(this.sealed)throw new RuntimeAdmissionError();this.ready=true;this.everOpened=true;}hasOpened():boolean{return this.everOpened;}seal():void{this.sealed=true;this.ready=false;}assertOpen():void{if(!this.ready||this.sealed)throw new RuntimeAdmissionError();}}
