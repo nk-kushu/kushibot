@@ -1,10 +1,10 @@
-import { ScopedDebugRecorder } from "../../src/events/ScopedDebugRecorder.js";
-import { LoggingController } from "../../src/events/LoggingController.js";
-import { BoundedDebugPublisher } from "../../src/events/BoundedDebugPublisher.js";
-import { DebugEventFactory } from "../../src/events/DebugEventFactory.js";
-import { DebugPayloadSanitizer } from "../../src/events/DebugPayloadSanitizer.js";
-import { DebugHealthCounter } from "../../src/events/DebugHealthCounter.js";
-import type { DebugEvent } from "../../src/events/DebugEvent.js";
+import { ScopedDebugRecorder } from "../../src/events/debug/ScopedDebugRecorder.js";
+import { LoggingController } from "../../src/events/debug/LoggingController.js";
+import { BoundedDebugPublisher } from "../../src/events/debug/BoundedDebugPublisher.js";
+import { DebugEventFactory } from "../../src/events/debug/DebugEventFactory.js";
+import { DebugPayloadSanitizer } from "../../src/events/debug/DebugPayloadSanitizer.js";
+import { DebugHealthCounter } from "../../src/events/debug/DebugHealthCounter.js";
+import type { DebugEvent } from "../../src/events/debug/DebugEvent.js";
 
 export async function checkDebugRecorder(): Promise<void> {
   const events: DebugEvent[] = [];
