@@ -620,3 +620,17 @@ export * from "./runtime/RuntimeShutdownOutcome.js";
 export * from "./runtime/RuntimeShutdownCoordinator.js";
 export * from "./runtime/FrameworkRuntime.js";
 export * from "./runtime/RuntimeShutdownSnapshotContract.js";
+
+// Durable application conversations, separate from agent execution journals.
+export type { ConversationThread } from "./conversations/ConversationThread.js";
+export type { ConversationMessage } from "./conversations/ConversationMessage.js";
+export type { CreateConversationThread, AppendConversationMessage } from "./conversations/ConversationCommands.js";
+export type { ConversationPage, ConversationThreadQuery, ConversationMessageQuery } from "./conversations/ConversationPage.js";
+export type { IConversationStore } from "./conversations/IConversationStore.js";
+export { ConversationContract } from "./conversations/ConversationContract.js";
+export { ConversationError } from "./errors/ConversationError.js";
+export type { ConversationErrorCode } from "./errors/ConversationError.js";
+export type { ConversationStatements } from "./persistence/conversations/ConversationStatements.js";
+export { sqliteConversationStatements } from "./persistence/conversations/sqliteConversationStatements.js";
+export { postgresqlConversationStatements } from "./persistence/conversations/postgresqlConversationStatements.js";
+export { SqlConversationStore } from "./persistence/conversations/SqlConversationStore.js";

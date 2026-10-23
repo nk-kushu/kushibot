@@ -28,6 +28,7 @@ import { checkPromptCacheKeys } from "../.test-build/tests/prompt-cache/checkPro
 import { checkSummaryContracts } from "../.test-build/tests/compression/checkSummaryContracts.js";
 import { checkCompressionFlow } from "../.test-build/tests/compression/checkCompressionFlow.js";
 import { checkFrameworkLifecycle } from "../.test-build/tests/runtime/checkFrameworkLifecycle.js";
+import { verifyConversationContracts } from "../.test-build/tests/conversations/ConversationContract.test.js";
 import { webcrypto } from "node:crypto";
 
 await verifyPolicies();
@@ -60,4 +61,5 @@ await checkPromptCacheKeys(webcrypto);
 await checkSummaryContracts();
 await checkCompressionFlow();
 await checkFrameworkLifecycle();
+await verifyConversationContracts();
 console.log("Offline contract and implementation checks passed.");

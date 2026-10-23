@@ -31,6 +31,13 @@ transitions, cancellation, and recovery evidence in revision-checked run
 aggregates. Checkpoint and recovery coordination require host-provided fencing,
 checkpoint, and SQL adapters before they can operate against production state.
 
+Reusable conversation storage is also available: scope-bound threads, ordered
+user/assistant messages, paginated history, optional run/session links, and
+idempotent creation. PostgreSQL and SQLite share an injected-driver repository.
+See [durable conversations](docs/conversations/README.md) for usage, boundaries,
+and real-driver acceptance commands. Conversation history is separate from agent
+session journaling and is not captured automatically.
+
 ## Development
 
 ```sh

@@ -19,7 +19,9 @@
     "example:shared-policy": "npm run build:examples && node .example-dist/examples/shared-policy/main.js",
     "example:configuration": "npm run build:examples && node .example-dist/examples/configuration/main.js",
     "example:lifecycle": "npm run build:examples && node .example-dist/examples/lifecycle/main.js",
-    "test": "tsc -p tsconfig.tests.json && node tests/run-tests.mjs"
+    "test": "tsc -p tsconfig.tests.json && node tests/run-tests.mjs",
+    "test:conversations": "npm run build && node tests/conversations/run-sql-acceptance.mjs",
+    "test:conversations:postgres": "npm run build && node tests/conversations/run-sql-acceptance.mjs --postgres"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
