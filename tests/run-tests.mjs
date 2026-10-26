@@ -63,3 +63,7 @@ await checkCompressionFlow();
 await checkFrameworkLifecycle();
 await verifyConversationContracts();
 console.log("Offline contract and implementation checks passed.");
+
+const { verifyAgents } = await import("../.test-build/tests/agents/Agent.test.js");
+await verifyAgents();
+console.log("Generic agent composition checks passed.");

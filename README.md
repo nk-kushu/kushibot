@@ -67,3 +67,11 @@ Memory and publication acceptance checks also require an injected disposable
 SQL database (and publication digest adapter); their host-backed checks are not
 run by the offline runner. The offline runtime lifecycle check uses fixtures and
 does not prove real process or worker quiescence.
+
+## Composed agents
+
+Use the generic `Agent<TTask, TResult>` and `AgentRuntimeFactory` to run an
+application-defined workflow with shared sessions, budgets, stores and execution
+controls. Applications supply their own tools and domain policies; no coding
+workflow is built into the agent abstraction. See [Composed agents](docs/generic-agents.md)
+for the API and a non-coding example.

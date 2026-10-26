@@ -634,3 +634,19 @@ export type { ConversationStatements } from "./persistence/conversations/Convers
 export { sqliteConversationStatements } from "./persistence/conversations/sqliteConversationStatements.js";
 export { postgresqlConversationStatements } from "./persistence/conversations/postgresqlConversationStatements.js";
 export { SqlConversationStore } from "./persistence/conversations/SqlConversationStore.js";
+
+// Generic composed agents; application workflows and policies remain outside the runtime.
+export { Agent } from "./agents/Agent.js";
+export { AgentRuntimeFactory } from "./agents/AgentRuntimeFactory.js";
+export { AgentRunRuntime } from "./agents/AgentRunRuntime.js";
+export { AgentModelTurn } from "./agents/AgentModelTurn.js";
+export { AgentTaskSessionProvider } from "./agents/AgentTaskSessionProvider.js";
+export type { AgentSessionBinding } from "./agents/AgentSessionBinding.js";
+export type {
+  AgentOptions, AgentWorkflow, AgentSetupInput, AgentRunOptions, AgentRunResult,
+  AgentRuntimeOptions, AgentRunStores, IAgentRunStoreFactory,
+} from "./agents/AgentContracts.js";
+export { InMemoryAgentStoreFactory } from "./agents/memory/InMemoryAgentStoreFactory.js";
+export { InMemoryAgentRunStore } from "./agents/memory/InMemoryAgentRunStore.js";
+export { InMemoryAgentUsageStore } from "./agents/memory/InMemoryAgentUsageStore.js";
+export { InMemoryAgentSessionJournal } from "./agents/memory/InMemoryAgentSessionJournal.js";
