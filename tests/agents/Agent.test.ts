@@ -12,10 +12,10 @@ import {
   WorkflowPolicyRegistry,
 } from "../../src/index.js";
 import type {
-  AgentRunResult,
-  AgentRunStores,
-  AgentSetupInput,
-  AgentWorkflow,
+  IAgentRunResult,
+  IAgentRunStores,
+  IAgentSetupInput,
+  IAgentWorkflow,
   ExecutionScopeRef,
   IAgentRunStoreFactory,
   IModelGateway,
@@ -98,17 +98,17 @@ class ResearchStores implements IAgentRunStoreFactory {
   readonly runs: string[] = [];
   async create(
     run: Readonly<{ runId: string; scope: ExecutionScopeRef }>,
-  ): Promise<AgentRunStores> {
+  ): Promise<IAgentRunStores> {
     this.runs.push(run.runId);
     return new InMemoryAgentStoreFactory().create();
   }
 }
-class ResearchDefinition implements IPolicy<AgentSetupInput<Question>, AgentWorkflow<Answer>> {
+class ResearchDefinition implements IPolicy<IAgentSetupInput<Question>, IAgentWorkflow<Answer>> {
   setups = 0;
   toolCalls = 0;
   acceptCompletion = true;
   invalidMapping = false;
-  async apply({ task, runtime }: AgentSetupInput<Question>): Promise<AgentWorkflow<Answer>> {
+  async apply({ task, runtime }: IAgentSetupInput<Question>): Promise<IAgentWorkflow<Answer>> {
     this.setups++;
     const json = new JsonValueContract(),
       tasks = new TaskInputContract(json),
@@ -315,7 +315,7 @@ export async function verifyAgents(): Promise<void> {
 }
 
 async function expectRejection(
-  work: () => Promise<AgentRunResult<Answer>>,
+  work: () => Promise<IAgentRunResult<Answer>>,
   message: string,
 ): Promise<void> {
   try {

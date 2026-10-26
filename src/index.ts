@@ -641,11 +641,15 @@ export { AgentRuntimeFactory } from "./agents/AgentRuntimeFactory.js";
 export { AgentRunRuntime } from "./agents/AgentRunRuntime.js";
 export { AgentModelTurn } from "./agents/AgentModelTurn.js";
 export { AgentTaskSessionProvider } from "./agents/AgentTaskSessionProvider.js";
-export type { AgentSessionBinding } from "./agents/AgentSessionBinding.js";
-export type {
-  AgentOptions, AgentWorkflow, AgentSetupInput, AgentRunOptions, AgentRunResult,
-  AgentRuntimeOptions, AgentRunStores, IAgentRunStoreFactory,
-} from "./agents/AgentContracts.js";
+export type { IAgentSessionBinding } from "./agents/IAgentSessionBinding.js";
+export type { IAgentOptions } from "./agents/IAgentOptions.js";
+export type { IAgentWorkflow } from "./agents/IAgentWorkflow.js";
+export type { IAgentSetupInput } from "./agents/IAgentSetupInput.js";
+export type { IAgentRunOptions } from "./agents/IAgentRunOptions.js";
+export type { IAgentRunResult } from "./agents/IAgentRunResult.js";
+export type { IAgentRuntimeOptions } from "./agents/IAgentRuntimeOptions.js";
+export type { IAgentRunStores } from "./agents/IAgentRunStores.js";
+export type { IAgentRunStoreFactory } from "./agents/IAgentRunStoreFactory.js";
 export { InMemoryAgentStoreFactory } from "./agents/memory/InMemoryAgentStoreFactory.js";
 export { InMemoryAgentRunStore } from "./agents/memory/InMemoryAgentRunStore.js";
 export { InMemoryAgentUsageStore } from "./agents/memory/InMemoryAgentUsageStore.js";

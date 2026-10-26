@@ -5,7 +5,7 @@ import type { CompletionDecision } from "../agentic/sessions/CompletionDecision.
 import type { IAgentToolCall } from "../agentic/sessions/IAgentToolCall.js";
 
 /** Application-supplied context and capabilities for one model session. */
-export interface AgentSessionBinding<TResult> {
+export interface IAgentSessionBinding<TResult> {
   readonly instructions: string;
   readonly input: JsonValue;
   readonly tools: IAgentToolCall;

@@ -31,7 +31,7 @@ if (run.outcome.status === "finished" && run.outcome.outcome.status === "complet
 ```
 
 `questionContract` implements `IResultContract<Question>`. `researchWorkflow`
-implements `IPolicy<AgentSetupInput<Question>, AgentWorkflow<Answer>>`.
+implements `IPolicy<IAgentSetupInput<Question>, IAgentWorkflow<Answer>>`.
 The complete executable non-coding example is exercised in
 [`tests/agents/Agent.test.ts`](../tests/agents/Agent.test.ts).
 
@@ -45,7 +45,7 @@ The complete executable non-coding example is exercised in
 | Create sessions and budgeted model calls      | Supply instructions, context, tools, acceptance  |
 | Return outcomes, snapshots, usage, journals   | Verify domain evidence and decide completion     |
 
-The workflow policy's `apply({ task, runtime })` builds an `AgentWorkflow<TResult>`:
+The workflow policy's `apply({ task, runtime })` builds an `IAgentWorkflow<TResult>`:
 
 - `definition`, `executors`, and `policies`: the existing workflow definition,
   executor registry, and step policy registry.
@@ -81,7 +81,7 @@ const taskFactory = runtime.createTaskFactory(answerContract, {
 ```
 
 The binding policy receives `AgentTaskBindingRequest` and returns
-`AgentSessionBinding<TResult>`. Use the returned factory with
+`IAgentSessionBinding<TResult>`. Use the returned factory with
 `StructuredTaskExecutor`, `WorkspaceInvestigationExecutor`, or
 `WorkspaceEditingExecutor`. Custom deterministic executors can use the same
 agent workflow without any model sessions.
@@ -106,7 +106,7 @@ Connections and other infrastructure supplied by the host remain host-owned.
 Using persistent adapters does not by itself add restart/resume orchestration to
 this convenience API; existing recovery/lifecycle APIs remain available.
 
-`run()` returns `AgentRunResult<TResult>` with the engine outcome, typed `result`,
+`run()` returns `IAgentRunResult<TResult>` with the engine outcome, typed `result`,
 workflow snapshot, usage snapshot, optional journal entries and artifacts.
 `result` is null unless the engine completed successfully. A mapped result failing
 its contract throws rather than being reported as a valid typed result.

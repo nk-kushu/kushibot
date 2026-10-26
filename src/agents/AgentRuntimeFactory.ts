@@ -1,4 +1,5 @@
-import type { AgentRunOptions, AgentRuntimeOptions } from "./AgentContracts.js";
+import type { IAgentRunOptions } from "./IAgentRunOptions.js";
+import type { IAgentRuntimeOptions } from "./IAgentRuntimeOptions.js";
 import type { IClock } from "../contracts/runtime/IClock.js";
 import type { IIdGenerator } from "../contracts/runtime/IIdGenerator.js";
 import { AgentRunRuntime } from "./AgentRunRuntime.js";
@@ -7,10 +8,10 @@ import { ModelRequestValidator } from "../agentic/model/ModelRequestValidator.js
 
 /** Selects infrastructure once and allocates fresh stores and controls for every run. */
 export class AgentRuntimeFactory {
-  private readonly options: AgentRuntimeOptions;
+  private readonly options: IAgentRuntimeOptions;
   private readonly clock: IClock;
   private readonly ids: IIdGenerator;
-  constructor(options: AgentRuntimeOptions) {
+  constructor(options: IAgentRuntimeOptions) {
     this.options = {
       ...options,
       profile: Object.freeze({ ...options.profile }),
@@ -37,7 +38,7 @@ export class AgentRuntimeFactory {
       this.options.profile,
     );
   }
-  async create(agentId: string, controls: AgentRunOptions = {}): Promise<AgentRunRuntime> {
+  async create(agentId: string, controls: IAgentRunOptions = {}): Promise<AgentRunRuntime> {
     const runId = this.ids.nextId(),
       operationId = this.ids.nextId();
     if (

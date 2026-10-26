@@ -4,8 +4,8 @@ import type { IClock } from "../contracts/runtime/IClock.js";
 import type { IIdGenerator } from "../contracts/runtime/IIdGenerator.js";
 import type { IExecutionContext } from "../executors/contracts/IExecutionContext.js";
 import type { AgentTaskBindingRequest } from "../executors/AgentTaskBindingRequest.js";
-import type { AgentSessionBinding } from "./AgentSessionBinding.js";
-import type { AgentRunStores } from "./AgentContracts.js";
+import type { IAgentSessionBinding } from "./IAgentSessionBinding.js";
+import type { IAgentRunStores } from "./IAgentRunStores.js";
 import type { IModelGateway } from "../models/contracts/IModelGateway.js";
 import type { ModelProfile } from "../models/ModelProfile.js";
 import type { JsonValue } from "../contracts/persistence/JsonValue.js";
@@ -20,7 +20,7 @@ export class AgentRunRuntime {
   constructor(
     readonly context: IExecutionContext,
     readonly budgetScopeId: string,
-    readonly stores: AgentRunStores,
+    readonly stores: IAgentRunStores,
     readonly ids: IIdGenerator,
     readonly clock: IClock,
     readonly maxTurns: number,
@@ -30,7 +30,7 @@ export class AgentRunRuntime {
   ) {}
   createTaskFactory<TResult>(
     result: IResultContract<TResult>,
-    bindings: IPolicy<AgentTaskBindingRequest, AgentSessionBinding<TResult>>,
+    bindings: IPolicy<AgentTaskBindingRequest, IAgentSessionBinding<TResult>>,
   ): SessionAgentTaskFactory<TResult> {
     return new SessionAgentTaskFactory(
       new AgentTaskSessionProvider(this, bindings),

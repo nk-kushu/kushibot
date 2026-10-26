@@ -3,7 +3,7 @@ import type { AgentTaskBindingRequest } from "../executors/AgentTaskBindingReque
 import type { IExecutionContext } from "../executors/contracts/IExecutionContext.js";
 import type { IResultContract } from "../contracts/validation/IResultContract.js";
 import type { IPolicy } from "../contracts/IPolicy.js";
-import type { AgentSessionBinding } from "./AgentSessionBinding.js";
+import type { IAgentSessionBinding } from "./IAgentSessionBinding.js";
 import type { AgentRunRuntime } from "./AgentRunRuntime.js";
 import { AgenticSession } from "../agentic/sessions/AgenticSession.js";
 import { AgentActionParser } from "../agentic/sessions/AgentActionParser.js";
@@ -12,7 +12,7 @@ import { JsonValueContract } from "../persistence/JsonValueContract.js";
 export class AgentTaskSessionProvider<TResult> implements IAgentTaskSessionProvider<TResult> {
   constructor(
     private readonly runtime: AgentRunRuntime,
-    private readonly bindings: IPolicy<AgentTaskBindingRequest, AgentSessionBinding<TResult>>,
+    private readonly bindings: IPolicy<AgentTaskBindingRequest, IAgentSessionBinding<TResult>>,
   ) {}
   async create(
     request: AgentTaskBindingRequest,
