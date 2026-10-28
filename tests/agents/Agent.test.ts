@@ -1,17 +1,23 @@
 import {
   Agent,
   AgentRuntimeFactory,
+  BoundedDebugPublisher,
+  DebugHealthCounter,
   DefaultAgentAssignmentPolicy,
   ExecutorRegistration,
   ExecutorRegistry,
   InMemoryAgentStoreFactory,
   JsonValueContract,
+  LoggingController,
+  ScopedDebugRecorderFactory,
   StepPolicyRegistry,
   StructuredTaskExecutor,
   TaskInputContract,
   WorkflowPolicyRegistry,
 } from "../../src/index.js";
 import type {
+  DebugEvent,
+  IScopedDebugRecorderFactory,
   IAgentRunResult,
   IAgentRunStores,
   IAgentSetupInput,
@@ -137,22 +143,22 @@ class ResearchDefinition implements IPolicy<IAgentSetupInput<Question>, IAgentWo
     });
     const executors = new ExecutorRegistry();
     executors.register(
-      new ExecutorRegistration(
-        "research",
-        "1",
-        tasks,
-        answers,
-        new StructuredTaskExecutor(
-          tasks,
-          answers,
-          new DefaultAgentAssignmentPolicy("Research the supplied question."),
+      new ExecutorRegistration({
+        id: "research",
+        version: "1",
+        input: tasks,
+        result: answers,
+        executor: new StructuredTaskExecutor({
+          input: tasks,
+          result: answers,
+          policy: new DefaultAgentAssignmentPolicy("Research the supplied question."),
           factory,
           json,
-          runtime.clock,
-        ),
+          clock: runtime.clock,
+        }),
         json,
-        runtime.clock,
-      ),
+        clock: runtime.clock,
+      }),
     );
     const policies = new StepPolicyRegistry();
     const inputRef = { id: "research-input", version: "1" },
@@ -226,7 +232,7 @@ class ResearchFixture {
     maxResponseBytes: 1_048_576,
     supportsPromptCacheKey: false,
   };
-  create(modelCalls = 10): Agent<Question, Answer> {
+  create(modelCalls = 10, debug?: IScopedDebugRecorderFactory): Agent<Question, Answer> {
     return new Agent({
       id: "research",
       requestContract: new QuestionContract(),
@@ -236,6 +242,7 @@ class ResearchFixture {
         profile: this.profile,
         stores: this.stores,
         limits: { modelCalls },
+        ...(debug ? { debug } : {}),
       }),
     });
   }
@@ -308,10 +315,49 @@ export async function verifyAgents(): Promise<void> {
     "result contract",
   );
 
+  await verifyAgentDebugEvents();
+
   const concurrent = new ResearchFixture().create();
   const active = concurrent.run({ question: "First?" });
   await expectRejection(() => concurrent.run({ question: "Second?" }), "already running");
   await active;
+}
+
+async function verifyAgentDebugEvents(): Promise<void> {
+  const events: DebugEvent[] = [];
+  const publisher = new BoundedDebugPublisher(
+    [{ id: "memory", sink: { send: async (event) => void events.push(event) } }],
+    1000,
+    1000,
+    new DebugHealthCounter(),
+  );
+  const debug = new ScopedDebugRecorderFactory({
+    logging: new LoggingController({ enabled: true, level: "debug" }),
+    publisher,
+    producerId: "agent-test",
+  });
+  const result = await new ResearchFixture().create(10, debug).run({ question: "Traced?" });
+  await publisher.drain();
+  const seen = events.map((event) => `${event.type}:${event.payload.operation ?? ""}`);
+  for (const expected of [
+    "operation.started:agent.run",
+    "operation.started:workflow.step",
+    "progress.reported:agent.session",
+    "operation.completed:model.call",
+    "progress.reported:model.reply",
+    "operation.completed:tool.call",
+    "progress.reported:tool.outcome",
+    "operation.completed:workflow.step",
+    "operation.completed:agent.run",
+    "progress.reported:agent.outcome",
+  ])
+    if (!seen.includes(expected)) throw new Error(`Agent debug events must include ${expected}.`);
+  if (events.some((event) => event.identity.runId !== result.runId))
+    throw new Error("Agent debug events must carry the run identity.");
+  if (events.at(-1)?.payload.nextState !== "completed")
+    throw new Error("The agent outcome event must report the final status.");
+  const quiet = await new ResearchFixture().create().run({ question: "Untraced?" });
+  if (quiet.result?.answer !== "42") throw new Error("Agents without debug must still run.");
 }
 
 async function expectRejection(

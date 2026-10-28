@@ -541,9 +541,17 @@ import { AgentTaskExecutor } from "./AgentTaskExecutor";
 import { ValidatedExecutor } from "./ValidatedExecutor";
 import { ExecutionOutcomeContract } from "../contracts/validation/ExecutionOutcomeContract";
 import { JsonValueContract } from "../persistence/JsonValueContract";
+export type StructuredTaskExecutorOptions<TResult> = Readonly<{
+  input: TaskInputContract;
+  result: IResultContract<TResult>;
+  policy: IPolicy<TaskInput, AgentTaskAssignment>;
+  factory: IAgentTaskFactory<TResult>;
+  json: JsonValueContract;
+  clock: IClock;
+}>;
 export class StructuredTaskExecutor<TResult> implements IExecutor<TaskInput,TResult> {
   private readonly checked: ValidatedExecutor<TaskInput,TResult>;
-  constructor(input: TaskInputContract, result: IResultContract<TResult>, policy: IPolicy<TaskInput,AgentTaskAssignment>, factory: IAgentTaskFactory<TResult>, json: JsonValueContract, clock: IClock) {
+  constructor({ input, result, policy, factory, json, clock }: StructuredTaskExecutorOptions<TResult>) {
     this.checked = new ValidatedExecutor(input,new ExecutionOutcomeContract(result,json),new AgentTaskExecutor("structured",policy,factory,clock),json,clock);
   }
   execute(input: TaskInput, context: IExecutionContext): Promise<ExecutionOutcome<TResult>> { return this.checked.execute(input,context); }
@@ -808,11 +816,22 @@ import { ExecutionOutcomeContract } from "../contracts/validation/ExecutionOutco
 import { JsonValueContract } from "../persistence/JsonValueContract";
 import { ValidatedExecutor } from "./ValidatedExecutor";
 import { ExecutorContractError } from "../errors/ExecutorContractError";
+export interface ExecutorRegistrationOptions<TInput, TResult> {
+  id: string;
+  version: string;
+  input: IResultContract<TInput>;
+  result: IResultContract<TResult>;
+  executor: IExecutor<TInput, TResult>;
+  json: JsonValueContract;
+  clock: IClock;
+}
+
 export class ExecutorRegistration<TInput,TResult> implements IExecutorRegistration {
   readonly metadata: ExecutorMetadata;
   private readonly checked: ValidatedExecutor<TInput,TResult>;
-  constructor(id: string, version: string, input: IResultContract<TInput>, result: IResultContract<TResult>, executor: IExecutor<TInput,TResult>,
-    private readonly json: JsonValueContract, clock: IClock) {
+  private readonly json: JsonValueContract;
+  constructor({ id, version, input, result, executor, json, clock }: ExecutorRegistrationOptions<TInput, TResult>) {
+    this.json = json;
     if (![id,version,input.id,input.version,result.id,result.version].every(value => /^[A-Za-z0-9_.:-]{1,128}$/.test(value))) throw new ExecutorContractError();
     this.metadata = Object.freeze({id,version,inputContractId:input.id,inputContractVersion:input.version,resultContractId:result.id,resultContractVersion:result.version});
     this.checked = new ValidatedExecutor(input,new ExecutionOutcomeContract(result,json),executor,json,clock);
@@ -909,14 +928,46 @@ export class LoginExecutorsExample {
     const json = new JsonValueContract(), task = new TaskInputContract(json);
     const findings = new InvestigationResultContract(json), specification = new LoginSpecificationContract(json), changes = new EditingResultContract(json);
     const investigate = new WorkspaceInvestigationExecutor(task,findings,new DefaultAgentAssignmentPolicy("Inspect permitted login source and cite verified evidence. Do not change files."),this.investigation,json,this.clock);
-    const specify = new StructuredTaskExecutor(task,specification,new DefaultAgentAssignmentPolicy("Prepare a source-backed login specification; preserve password login and require expiry validation."),this.specification,json,this.clock);
+    const specify = new StructuredTaskExecutor({ input: task, result: specification, policy: new DefaultAgentAssignmentPolicy("Prepare a source-backed login specification; preserve password login and require expiry validation."), factory: this.specification, json, clock: this.clock });
     const edit = new WorkspaceEditingExecutor(task,changes,new DefaultAgentAssignmentPolicy("Implement only the accepted specification in the permitted working copy; retain change/check references."),this.editing,json,this.clock);
     const verificationInput = new VerificationInputContract(json), verificationResult = new VerificationResultContract(json,new VerificationCheckResultContract(json));
     const registry = new ExecutorRegistry();
-    registry.register(new ExecutorRegistration("workspace-investigation","1",task,findings,investigate,json,this.clock));
-    registry.register(new ExecutorRegistration("login-specification","1",task,specification,specify,json,this.clock));
-    registry.register(new ExecutorRegistration("workspace-editing","1",task,changes,edit,json,this.clock));
-    registry.register(new ExecutorRegistration("verification","1",verificationInput,verificationResult,this.verification,json,this.clock));
+    registry.register(new ExecutorRegistration({
+      id: "workspace-investigation",
+      version: "1",
+      input: task,
+      result: findings,
+      executor: investigate,
+      json,
+      clock: this.clock,
+    }));
+    registry.register(new ExecutorRegistration({
+      id: "login-specification",
+      version: "1",
+      input: task,
+      result: specification,
+      executor: specify,
+      json,
+      clock: this.clock,
+    }));
+    registry.register(new ExecutorRegistration({
+      id: "workspace-editing",
+      version: "1",
+      input: task,
+      result: changes,
+      executor: edit,
+      json,
+      clock: this.clock,
+    }));
+    registry.register(new ExecutorRegistration({
+      id: "verification",
+      version: "1",
+      input: verificationInput,
+      result: verificationResult,
+      executor: this.verification,
+      json,
+      clock: this.clock,
+    }));
     return registry;
   }
 }

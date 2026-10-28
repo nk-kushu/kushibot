@@ -1,3 +1,4 @@
+import { checkSharedInfrastructure } from "../.test-build/tests/persistence/SharedInfrastructure.test.js";
 import { verifyPolicies } from "../.test-build/tests/contracts/Policy.test.js";
 import { verifyExecutorOutcomes } from "../.test-build/tests/contracts/Executor.test.js";
 import { verifyValidation } from "../.test-build/tests/contracts/ResultContract.test.js";
@@ -14,6 +15,8 @@ import { checkUsageLedger } from "../.test-build/tests/usage/checkUsageLedger.js
 import { checkPartialOutcomes } from "../.test-build/tests/execution-control/checkPartialOutcomes.js";
 import { checkDebugRecorder } from "../.test-build/tests/events/checkDebugRecorder.js";
 import { checkOpenAiTextMapping } from "../.test-build/tests/model/checkOpenAiTextMapping.js";
+import { checkGatewayClock } from "../.test-build/tests/model/checkGatewayClock.js";
+import { checkCodexCliGateway } from "../.test-build/tests/model/checkCodexCliGateway.js";
 import { checkDecisionUnit } from "../.test-build/tests/decisions/checkDecisionUnit.js";
 import { checkModelRouting } from "../.test-build/tests/models/checkModelRouting.js";
 import { checkModelHandoffs } from "../.test-build/tests/models/checkModelHandoffs.js";
@@ -47,6 +50,8 @@ checkUsageLedger();
 checkPartialOutcomes();
 await checkDebugRecorder();
 checkOpenAiTextMapping();
+await checkGatewayClock();
+await checkCodexCliGateway();
 await checkDecisionUnit();
 await checkModelRouting();
 await checkModelHandoffs();
@@ -67,3 +72,5 @@ console.log("Offline contract and implementation checks passed.");
 const { verifyAgents } = await import("../.test-build/tests/agents/Agent.test.js");
 await verifyAgents();
 console.log("Generic agent composition checks passed.");
+
+await checkSharedInfrastructure();

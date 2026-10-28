@@ -8,8 +8,8 @@ durable usage ledger with explicit partial outcomes. SQL-backed services use an
 injected binding; no SQLite or PostgreSQL driver is bundled. Applications supply
 a binding that satisfies `ISqlDatabase`. The library also includes a bounded
 non-streaming text model gateway, a single-choice DecisionUnit, and policy-based
-model routing with validated handoff records. A live model call requires an
-explicit host-supplied transport and credentials. Tool dispatch uses scoped
+model routing with validated handoff records. Hosts configure model access through
+an HTTP transport and credentials or the Codex CLI's saved authentication. Tool dispatch uses scoped
 authorization and operation receipts; isolated SQL text workspaces provide
 revision-checked sequential editing; versioned guards connect skill guidance to
 registered evidence-producing checks and enforcement. Context composition keeps
@@ -75,3 +75,6 @@ application-defined workflow with shared sessions, budgets, stores and execution
 controls. Applications supply their own tools and domain policies; no coding
 workflow is built into the agent abstraction. See [Composed agents](docs/generic-agents.md)
 for the API and a non-coding example.
+
+For a model gateway using the installed Codex CLI and its existing `auth.json`,
+see [Codex CLI model gateway](docs/codex-cli.md).

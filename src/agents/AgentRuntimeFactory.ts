@@ -5,6 +5,8 @@ import type { IIdGenerator } from "../contracts/runtime/IIdGenerator.js";
 import { AgentRunRuntime } from "./AgentRunRuntime.js";
 import { InMemoryAgentStoreFactory } from "./memory/InMemoryAgentStoreFactory.js";
 import { ModelRequestValidator } from "../agentic/model/ModelRequestValidator.js";
+import { SystemClock } from "../runtime/SystemClock.js";
+import { NoopDebugRecorder } from "../events/debug/NoopDebugRecorder.js";
 
 /** Selects infrastructure once and allocates fresh stores and controls for every run. */
 export class AgentRuntimeFactory {
@@ -18,7 +20,7 @@ export class AgentRuntimeFactory {
       limits: { ...options.limits },
       scope: options.scope ? Object.freeze({ ...options.scope }) : undefined,
     };
-    this.clock = options.clock ?? { nowEpochMs: () => Date.now() };
+    this.clock = options.clock ?? new SystemClock();
     this.ids = options.ids ?? { nextId: () => crypto.randomUUID() };
     for (const [name, value, max] of [
       ["maxTurns", options.maxTurns ?? 30, 128],
@@ -57,6 +59,9 @@ export class AgentRuntimeFactory {
       runId,
       scope,
     });
+    const debug =
+      this.options.debug?.create({ scope, identity: { runId, operationId } }) ??
+      new NoopDebugRecorder();
     const budgetScopeId = `budget:${runId}`;
     await stores.usage.initialize({
       schemaVersion: 1,
@@ -85,6 +90,7 @@ export class AgentRuntimeFactory {
         deadlineEpochMs,
         reporter: Object.freeze({
           progress: async (message: string) => {
+            debug.event("progress.reported", "info", { summary: message });
             await controls.onProgress?.(message);
           },
         }),
@@ -97,6 +103,7 @@ export class AgentRuntimeFactory {
       this.options.gateway,
       this.options.profile,
       this.options.modelTimeoutMs ?? 60_000,
+      debug,
     );
   }
 }

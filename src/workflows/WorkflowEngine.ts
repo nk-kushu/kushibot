@@ -2,6 +2,7 @@ import type { IWorkflowRunStore } from "./IWorkflowRunStore.js";
 import type { IWorkflowStepRunnerFactory } from "./IWorkflowStepRunnerFactory.js";
 import type { WorkflowEngineOutcome } from "./WorkflowEngineOutcome.js";
 import type { WorkflowRunSnapshot } from "./WorkflowRunSnapshot.js";
+import type { StepRunOutcome } from "./StepRunOutcome.js";
 import type { StepContextEvidenceInput } from "./StepContextEvidenceInput.js";
 import type { IPolicy } from "../contracts/IPolicy.js";
 import type { IUsageLedgerStore } from "../usage/IUsageLedgerStore.js";
@@ -19,6 +20,8 @@ import { zeroUsage } from "../usage/zeroUsage.js";
 import { collectWorkflowPartial } from "./collectWorkflowPartial.js";
 import { canonicalWorkflowValue as same } from "./canonicalWorkflowValue.js";
 import { WorkflowRunError } from "../errors/WorkflowRunError.js";
+import type { IScopedDebugRecorder } from "../events/debug/IScopedDebugRecorder.js";
+import { NoopDebugRecorder } from "../events/debug/NoopDebugRecorder.js";
 export class WorkflowEngine{
  constructor(private readonly store:IWorkflowRunStore,
     private readonly runners:IWorkflowStepRunnerFactory,
@@ -27,7 +30,9 @@ export class WorkflowEngine{
     private readonly ledger:IUsageLedgerStore,
     private readonly ids:IIdGenerator,
     private readonly clock:IClock,
-    private readonly json:JsonValueContract){}
+    private readonly json:JsonValueContract,
+    /** Traces step attempts and corrections; records nothing by default. */
+    private readonly debug:IScopedDebugRecorder=new NoopDebugRecorder()){}
  async run(rawContext:IExecutionContext):Promise<WorkflowEngineOutcome>{
   let snapshot=await this.store.read();
   if(rawContext.identity.runId!==snapshot.runId||
@@ -48,7 +53,7 @@ export class WorkflowEngine{
    if(snapshot.lifecycle.pendingOperationRefs.length>0){await this.store.mutate(run=>run.interrupt(owner));return this.present(await this.store.read());}
    const aggregate=await WorkflowRun.restore(snapshot);
    const unfinished=snapshot.attempts.find(attempt=>attempt.receipt===null);
-   if(unfinished!==undefined){const execution:IExecutionContext=Object.freeze({...context,identity:Object.freeze({...context.identity,operationId:unfinished.claim.operationId,stepRunId:unfinished.claim.stepRunId,parentOperationId:unfinished.claim.commandId})});const result=await runner.resume(unfinished,execution);if(result.status==="pending"){await this.store.mutate(run=>run.interrupt(owner));return this.present(await this.store.read());}if(result.status==="blocked")return this.stop(owner,{code:"no-progress",message:"Recovered attempt could not advance."});continue;}
+   if(unfinished!==undefined){const execution:IExecutionContext=Object.freeze({...context,identity:Object.freeze({...context.identity,operationId:unfinished.claim.operationId,stepRunId:unfinished.claim.stepRunId,parentOperationId:unfinished.claim.commandId})});const result=await this.traced("workflow.step.resume",unfinished.claim.step.id,()=>runner.resume(unfinished,execution));if(result.status==="pending"){await this.store.mutate(run=>run.interrupt(owner));return this.present(await this.store.read());}if(result.status==="blocked")return this.stop(owner,{code:"no-progress",message:"Recovered attempt could not advance."});continue;}
    const trigger=aggregate.unprocessed();
    if(trigger!==null){
     let chosen:string|null=null;
@@ -71,7 +76,7 @@ export class WorkflowEngine{
     if(!admitted.admitted){await this.store.mutate(run=>run.denyCorrection(owner,plan));return this.stop(owner,{code:"limit-reached",message:"Shared correction allowance is exhausted."});}
     if(admitted.replayed){await this.store.mutate(run=>run.interrupt(owner));return this.present(await this.store.read());}
     const afterBudget=guard.check();if(afterBudget!==null)return this.stop(owner,afterBudget);
-    await this.store.mutate(run=>run.applyCorrection(owner,plan));continue;
+    await this.store.mutate(run=>run.applyCorrection(owner,plan));this.debug.event("policy.applied","info",{operation:"workflow.correction",relatedRefs:[`transition:${transitionId}`,`step:${trigger.stepId}`]});continue;
    }
    if(snapshot.accepted.length===snapshot.definition.steps.length){
     const checked=await this.json.validate(await this.policies.completion(snapshot.completionPolicy).apply(Object.freeze({run:snapshot,execution:context})));
@@ -96,11 +101,16 @@ export class WorkflowEngine{
    if(stepRunId===null)return this.stop(owner,{code:"limit-reached",message:"Workflow or step attempt allowance is exhausted."});
    const view=(await WorkflowRun.restore(await this.store.read())).view(step.id);
    const execution:IExecutionContext=Object.freeze({...context,identity:Object.freeze({...context.identity,stepRunId,operationId:this.ids.nextId(),parentOperationId:context.identity.operationId})});
-   const result=await runner.run({workflow:{id:snapshot.definition.id,version:snapshot.definition.version},stepId:step.id,view},execution);
+   const result=await this.traced("workflow.step",step.id,()=>runner.run({workflow:{id:snapshot.definition.id,version:snapshot.definition.version},stepId:step.id,view},execution));
    if(result.status==="pending"){await this.store.mutate(run=>run.interrupt(owner));return this.present(await this.store.read());}
    if(result.status==="blocked")return this.stop(owner,{code:"no-progress",message:"StepRunner blocked the attempt: "+result.code});
   }
   return this.stop(owner,{code:"no-progress",message:"Workflow orchestration boundary limit reached."});
+ }
+ private async traced(operation:string,stepId:string,work:()=>Promise<StepRunOutcome>):Promise<StepRunOutcome>{
+  const result=await this.debug.operation(operation,work,{relatedRefs:[`step:${stepId}`]});
+  this.debug.event("progress.reported",result.status==="recorded"?"debug":"warn",{operation:`${operation}.outcome`,nextState:result.status,relatedRefs:[`step:${stepId}`]});
+  return result;
  }
  private async stop(owner:string,reason:ExecutionStopReason):Promise<WorkflowEngineOutcome>{await this.store.mutate(run=>run.stop(owner,reason));return this.present(await this.store.read());}
  private present(snapshot:WorkflowRunSnapshot):WorkflowEngineOutcome{

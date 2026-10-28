@@ -137,6 +137,12 @@ export { StoredDebugEventSink } from "./events/debug/StoredDebugEventSink.js";
 export type { ITextLogWriter } from "./events/debug/ITextLogWriter.js";
 export { JsonlDebugSink } from "./events/debug/JsonlDebugSink.js";
 export { DebugTimelineFormatter } from "./events/debug/DebugTimelineFormatter.js";
+export { NoopDebugRecorder } from "./events/debug/NoopDebugRecorder.js";
+export type { DebugRecorderTarget, IScopedDebugRecorderFactory } from "./events/debug/IScopedDebugRecorderFactory.js";
+export { ScopedDebugRecorderFactory } from "./events/debug/ScopedDebugRecorderFactory.js";
+export type { ScopedDebugRecorderFactoryOptions } from "./events/debug/ScopedDebugRecorderFactory.js";
+export { DebugRecordingModelGateway } from "./agents/DebugRecordingModelGateway.js";
+export { DebugRecordingToolCall } from "./agents/DebugRecordingToolCall.js";
 
 export type { UsageAmounts } from "./usage/UsageAmounts.js";
 export { usageDimensions } from "./usage/usageDimensions.js";
@@ -182,6 +188,11 @@ export { OpenAiTextRequestMapper } from "./agentic/model/openai/OpenAiTextReques
 export { OpenAiTextReplyMapper } from "./agentic/model/openai/OpenAiTextReplyMapper.js";
 export { OpenAiTextGateway } from "./agentic/model/openai/OpenAiTextGateway.js";
 export { OpenAiTextGatewayFactory } from "./agentic/model/openai/OpenAiTextGatewayFactory.js";
+export { CodexCliTextGatewayFactory } from "./agentic/model/codex/CodexCliTextGatewayFactory.js";
+export { CodexCliTextGateway } from "./agentic/model/codex/CodexCliTextGateway.js";
+export { CodexCliTransport } from "./agentic/model/codex/CodexCliTransport.js";
+export type { CodexCliOptions } from "./agentic/model/codex/CodexCliOptions.js";
+export type { ICodexCliTransport } from "./agentic/model/codex/ICodexCliTransport.js";
 export { OpenAiHttpTransport } from "./agentic/model/openai/OpenAiHttpTransport.js";
 export type { ModelCallOutcome } from "./agentic/model/ModelCallOutcome.js";
 export { BudgetedModelCall } from "./agentic/model/BudgetedModelCall.js";
@@ -271,6 +282,7 @@ export { SqlTextWorkspaceProvider } from "./workspaces/SqlTextWorkspaceProvider.
 export { SqlWorkspaceFiles } from "./workspaces/SqlWorkspaceFiles.js";
 export { SqlWorkspaceEditGate } from "./workspaces/SqlWorkspaceEditGate.js";
 export { WorkspaceEditSession } from "./workspaces/WorkspaceEditSession.js";
+export { WorkspaceEvidence } from "./workspaces/WorkspaceEvidence.js";
 export type { WorkspaceEditingOutcome } from "./workspaces/WorkspaceEditingOutcome.js";
 export { SequentialWorkspaceEditor } from "./workspaces/SequentialWorkspaceEditor.js";
 export { WorkspaceSourceReader } from "./workspaces/WorkspaceSourceReader.js";
@@ -438,6 +450,7 @@ export { EditingResultContract } from "./executors/EditingResultContract.js";
 export { WorkspaceInvestigationExecutor } from "./executors/WorkspaceInvestigationExecutor.js";
 export { WorkspaceEditingExecutor } from "./executors/WorkspaceEditingExecutor.js";
 export { StructuredTaskExecutor } from "./executors/StructuredTaskExecutor.js";
+export type { StructuredTaskExecutorOptions } from "./executors/StructuredTaskExecutor.js";
 export type { VerificationInput } from "./executors/VerificationInput.js";
 export { VerificationInputContract } from "./executors/VerificationInputContract.js";
 export type { VerificationCheckResult } from "./executors/VerificationCheckResult.js";
@@ -449,6 +462,7 @@ export type { IVerificationReceiptVerifier } from "./executors/IVerificationRece
 export { VerificationExecutor } from "./executors/VerificationExecutor.js";
 export type { ExecutorMetadata } from "./executors/ExecutorMetadata.js";
 export type { IExecutorRegistration } from "./executors/contracts/IExecutorRegistration.js";
+export type { ExecutorRegistrationOptions } from "./executors/ExecutorRegistration.js";
 export { ExecutorRegistration } from "./executors/ExecutorRegistration.js";
 export { ExecutorRegistry } from "./executors/ExecutorRegistry.js";
 export type { IVerificationTargetResolver } from "./executors/IVerificationTargetResolver.js";
@@ -654,3 +668,10 @@ export { InMemoryAgentStoreFactory } from "./agents/memory/InMemoryAgentStoreFac
 export { InMemoryAgentRunStore } from "./agents/memory/InMemoryAgentRunStore.js";
 export { InMemoryAgentUsageStore } from "./agents/memory/InMemoryAgentUsageStore.js";
 export { InMemoryAgentSessionJournal } from "./agents/memory/InMemoryAgentSessionJournal.js";
+
+export { JoiArgumentsContract } from "./tools/JoiArgumentsContract.js";
+
+export { InMemoryToolOperationJournal } from "./tools/operations/InMemoryToolOperationJournal.js";
+export { NodeSqliteDatabase } from "./persistence/sqlite/NodeSqliteDatabase.js";
+
+export { FilesystemWorkingCopy } from "./workspaces/FilesystemWorkingCopy.js";

@@ -10,11 +10,22 @@ import { ExecutionOutcomeContract } from "../contracts/validation/ExecutionOutco
 import { JsonValueContract } from "../persistence/JsonValueContract.js";
 import { ValidatedExecutor } from "./ValidatedExecutor.js";
 import { ExecutorContractError } from "../errors/ExecutorContractError.js";
+export interface ExecutorRegistrationOptions<TInput, TResult> {
+  id: string;
+  version: string;
+  input: IResultContract<TInput>;
+  result: IResultContract<TResult>;
+  executor: IExecutor<TInput, TResult>;
+  json: JsonValueContract;
+  clock: IClock;
+}
+
 export class ExecutorRegistration<TInput,TResult> implements IExecutorRegistration {
   readonly metadata: ExecutorMetadata;
   private readonly checked: ValidatedExecutor<TInput,TResult>;
-  constructor(id: string, version: string, input: IResultContract<TInput>, result: IResultContract<TResult>, executor: IExecutor<TInput,TResult>,
-    private readonly json: JsonValueContract, clock: IClock) {
+  private readonly json: JsonValueContract;
+  constructor({ id, version, input, result, executor, json, clock }: ExecutorRegistrationOptions<TInput, TResult>) {
+    this.json = json;
     if (![id,version,input.id,input.version,result.id,result.version].every(value => /^[A-Za-z0-9_.:-]{1,128}$/.test(value))) throw new ExecutorContractError();
     this.metadata = Object.freeze({id,version,inputContractId:input.id,inputContractVersion:input.version,resultContractId:result.id,resultContractVersion:result.version});
     this.checked = new ValidatedExecutor(input,new ExecutionOutcomeContract(result,json),executor,json,clock);

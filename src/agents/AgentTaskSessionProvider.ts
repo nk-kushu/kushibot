@@ -8,6 +8,7 @@ import type { AgentRunRuntime } from "./AgentRunRuntime.js";
 import { AgenticSession } from "../agentic/sessions/AgenticSession.js";
 import { AgentActionParser } from "../agentic/sessions/AgentActionParser.js";
 import { JsonValueContract } from "../persistence/JsonValueContract.js";
+import { DebugRecordingToolCall } from "./DebugRecordingToolCall.js";
 
 export class AgentTaskSessionProvider<TResult> implements IAgentTaskSessionProvider<TResult> {
   constructor(
@@ -27,13 +28,17 @@ export class AgentTaskSessionProvider<TResult> implements IAgentTaskSessionProvi
     if (!checked.valid || !binding.instructions.trim())
       throw new Error("Invalid agent session binding.");
     const turn = this.runtime.createTurn(binding.instructions, checked.value);
+    this.runtime.debug.event("progress.reported", "debug", {
+      operation: "agent.session",
+      relatedRefs: [`session:${sessionId}`],
+    });
     return {
       create: async () =>
         new AgenticSession<TResult>(
           sessionId,
           this.runtime.maxTurns,
           turn,
-          binding.tools,
+          new DebugRecordingToolCall(binding.tools, this.runtime.debug),
           new AgentActionParser(json),
           result,
           binding.acceptance,

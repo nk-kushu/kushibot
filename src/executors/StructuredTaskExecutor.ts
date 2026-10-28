@@ -13,9 +13,19 @@ import { AgentTaskExecutor } from "./AgentTaskExecutor.js";
 import { ValidatedExecutor } from "./ValidatedExecutor.js";
 import { ExecutionOutcomeContract } from "../contracts/validation/ExecutionOutcomeContract.js";
 import { JsonValueContract } from "../persistence/JsonValueContract.js";
+
+export type StructuredTaskExecutorOptions<TResult> = Readonly<{
+  input: TaskInputContract;
+  result: IResultContract<TResult>;
+  policy: IPolicy<TaskInput, AgentTaskAssignment>;
+  factory: IAgentTaskFactory<TResult>;
+  json: JsonValueContract;
+  clock: IClock;
+}>;
+
 export class StructuredTaskExecutor<TResult> implements IExecutor<TaskInput,TResult> {
   private readonly checked: ValidatedExecutor<TaskInput,TResult>;
-  constructor(input: TaskInputContract, result: IResultContract<TResult>, policy: IPolicy<TaskInput,AgentTaskAssignment>, factory: IAgentTaskFactory<TResult>, json: JsonValueContract, clock: IClock) {
+  constructor({ input, result, policy, factory, json, clock }: StructuredTaskExecutorOptions<TResult>) {
     this.checked = new ValidatedExecutor(input,new ExecutionOutcomeContract(result,json),new AgentTaskExecutor("structured",policy,factory,clock),json,clock);
   }
   execute(input: TaskInput, context: IExecutionContext): Promise<ExecutionOutcome<TResult>> { return this.checked.execute(input,context); }

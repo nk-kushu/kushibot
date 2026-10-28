@@ -24,11 +24,11 @@ export class ScopedDebugRecorder implements IScopedDebugRecorder {
       return this.publisher.tryPublish(event) ? event.eventId : null;
     } catch { this.captureFailed(); return null; }
   }
-  async operation<TResult>(name: string, work: () => Promise<TResult>): Promise<TResult> {
+  async operation<TResult>(name: string, work: () => Promise<TResult>, details?: unknown): Promise<TResult> {
     let span: Readonly<{ trace: TraceContext; started: number; startEventId: string | null }> | null = null;
     try {
       const trace: TraceContext = { traceId: this.trace.traceId, spanId: this.ids.nextId(), parentSpanId: this.trace.spanId, causationEventId: null };
-      span = { trace, started: this.monotonic.nowMs(), startEventId: this.event("operation.started", "debug", { operation: name }, trace) };
+      span = { trace, started: this.monotonic.nowMs(), startEventId: this.event("operation.started", "debug", { ...this.details(details), operation: name }, trace) };
     } catch { this.captureFailed(); }
     try {
       const result = await work();
@@ -47,6 +47,9 @@ export class ScopedDebugRecorder implements IScopedDebugRecorder {
         operation: name, durationMs, ...(failed ? { code: "OPERATION_FAILED" } : {}),
       }, { ...span.trace, causationEventId: span.startEventId });
     } catch { this.captureFailed(); }
+  }
+  private details(value: unknown): object {
+    return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
   }
   private captureFailed(): void { try { this.health.record("capture-failed"); } catch { /* Independent best-effort health path. */ } }
 }

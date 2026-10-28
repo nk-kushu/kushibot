@@ -108,8 +108,25 @@ export class Agent<TTask, TResult> {
       runtime.ids,
       runtime.clock,
       json,
+      runtime.debug,
     );
-    const outcome = await engine.run(runtime.context);
+    const outcome = await runtime.debug.operation("agent.run", () => engine.run(runtime.context), {
+      relatedRefs: [
+        `agent:${this.id}`,
+        `workflow:${workflow.definition.id}@${workflow.definition.version}`,
+      ],
+    });
+    runtime.debug.event(
+      "progress.reported",
+      outcome.status === "finished" && outcome.outcome.status === "completed" ? "info" : "warn",
+      {
+        operation: "agent.outcome",
+        nextState: outcome.status === "finished" ? outcome.outcome.status : outcome.status,
+        ...(outcome.status === "finished" && outcome.outcome.status === "stopped"
+          ? { relatedRefs: [`reason:${outcome.outcome.reason.code}`] }
+          : {}),
+      },
+    );
     let result: TResult | null = null;
     if (outcome.status === "finished" && outcome.outcome.status === "completed") {
       const mapped = await workflow.resultContract.validate(
