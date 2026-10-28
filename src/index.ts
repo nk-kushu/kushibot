@@ -675,3 +675,16 @@ export { InMemoryToolOperationJournal } from "./tools/operations/InMemoryToolOpe
 export { NodeSqliteDatabase } from "./persistence/sqlite/NodeSqliteDatabase.js";
 
 export { FilesystemWorkingCopy } from "./workspaces/FilesystemWorkingCopy.js";
+export { WorkspaceChangeReader } from "./publication/WorkspaceChangeReader.js";
+export type { WorkspaceChange } from "./publication/WorkspaceChangeReader.js";
+export { WorkspaceProposalBuilder } from "./publication/WorkspaceProposalBuilder.js";
+export { FilesystemPublicationTarget } from "./publication/FilesystemPublicationTarget.js";
+export type { IFilesystemPublicationReceiptStore } from "./publication/FilesystemPublicationTarget.js";
+export type { FilesystemReceiptStatements } from "./persistence/publication/FilesystemReceiptStatements.js";
+export { sqliteFilesystemReceiptStatements } from "./persistence/publication/sqliteFilesystemReceiptStatements.js";
+export { postgresqlFilesystemReceiptStatements } from "./persistence/publication/postgresqlFilesystemReceiptStatements.js";
+export { SqlFilesystemReceiptStore } from "./persistence/publication/SqlFilesystemReceiptStore.js";
+
+export { LocalWorkspaceArtifacts } from "./workspaces/LocalWorkspaceArtifacts.js";
+export { LocalWorkspaceProposalService } from "./publication/LocalWorkspaceProposalService.js";
+export { LocalWorkspacePublicationService } from "./publication/LocalWorkspacePublicationService.js";
