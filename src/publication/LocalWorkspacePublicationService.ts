@@ -139,7 +139,7 @@ export class LocalWorkspacePublicationService {
       if (!current || current.proposal.digest !== approvedDigest)
         throw new PublicationError();
       if (reconcileOnly && !current.command)
-        return { status: "waiting-for-approval", effect: null };
+        return { status: "waiting-for-approval" as const, effect: null };
       const outcome = current.command
         ? await coordinator.reconcile(input.id, context)
         : await coordinator.publish(

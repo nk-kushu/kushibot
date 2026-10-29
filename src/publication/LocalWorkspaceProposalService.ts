@@ -161,7 +161,7 @@ export class LocalWorkspaceProposalService {
         }
         changes.push(change);
       }
-      const status =
+      const status: "applied" | "not-applied" | "pending" | "ready" =
         record.effect?.status === "published"
           ? "applied"
           : record.effect?.status === "not-applied"
