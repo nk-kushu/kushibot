@@ -98,6 +98,7 @@ export class Agent<TTask, TResult> {
       workflow.policies,
       runtime.ids,
       runtime.clock,
+      runtime.debug,
     );
     const engine = new WorkflowEngine(
       runtime.stores.workflow,
@@ -110,11 +111,44 @@ export class Agent<TTask, TResult> {
       json,
       runtime.debug,
     );
-    const outcome = await runtime.debug.operation("agent.run", () => engine.run(runtime.context), {
+    const outcome = await runtime.debug.operation("agent.run", () => {
+      runtime.debug.event("progress.reported", "info", {
+        operation: "workflow.plan",
+        count: workflow.definition.steps.length,
+        relatedRefs: [
+          ...workflow.definition.steps.map(
+            (step) =>
+              `step:${step.id}=executor:${step.executor.id}@${step.executor.version}` +
+              (step.dependencies.length ? `<-${step.dependencies.join(",")}` : ""),
+          ),
+          ...workflow.definition.transitions.map(
+            (transition) =>
+              `transition:${transition.id}=${transition.fromStepId}->${transition.toStepId}`,
+          ),
+        ]
+          .slice(0, 32)
+          .map((ref) => ref.slice(0, 256)),
+      });
+      return engine.run(runtime.context);
+    }, {
       relatedRefs: [
         `agent:${this.id}`,
         `workflow:${workflow.definition.id}@${workflow.definition.version}`,
       ],
+    });
+    const artifacts = workflow.artifacts?.() ?? {};
+    const artifactKeys = Object.keys(artifacts).filter((key) => key.startsWith("artifact:"));
+    runtime.debug.event("result.persisted", "info", {
+      operation: "artifacts.collected",
+      count: artifactKeys.length,
+      relatedRefs: artifactKeys.slice(0, 32).map((key) => key.slice(0, 256)),
+      metrics: {
+        artifacts: artifactKeys.length,
+        bytes: artifactKeys.reduce((total, key) => {
+          const value = artifacts[key];
+          return total + (typeof value === "object" && value !== null && "byteLength" in value && typeof value.byteLength === "number" ? value.byteLength : 0);
+        }, 0),
+      },
     });
     runtime.debug.event(
       "progress.reported",
@@ -142,7 +176,7 @@ export class Agent<TTask, TResult> {
       snapshot: await runtime.stores.workflow.read(),
       usage: await runtime.stores.usage.read(),
       journal: (await runtime.stores.readJournal?.()) ?? [],
-      artifacts: workflow.artifacts?.() ?? {},
+      artifacts,
     };
   }
 }

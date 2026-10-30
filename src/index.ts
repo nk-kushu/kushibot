@@ -143,6 +143,7 @@ export { ScopedDebugRecorderFactory } from "./events/debug/ScopedDebugRecorderFa
 export type { ScopedDebugRecorderFactoryOptions } from "./events/debug/ScopedDebugRecorderFactory.js";
 export { DebugRecordingModelGateway } from "./agents/DebugRecordingModelGateway.js";
 export { DebugRecordingToolCall } from "./agents/DebugRecordingToolCall.js";
+export { DebugRecordingArtifactWriter } from "./agents/DebugRecordingArtifactWriter.js";
 
 export type { UsageAmounts } from "./usage/UsageAmounts.js";
 export { usageDimensions } from "./usage/usageDimensions.js";
@@ -397,6 +398,7 @@ export { ComposedAgentTurn } from "./agentic/sessions/ComposedAgentTurn.js";
 export type { ISessionJournal } from "./agentic/sessions/ISessionJournal.js";
 export type { IAgentToolCall } from "./agentic/sessions/IAgentToolCall.js";
 export { AgenticSession } from "./agentic/sessions/AgenticSession.js";
+export type { IAgenticSessionOptions } from "./agentic/sessions/IAgenticSessionOptions.js";
 export type { IAgenticSessionFactory } from "./agentic/sessions/IAgenticSessionFactory.js";
 export { AgenticMindUnit } from "./agentic/sessions/AgenticMindUnit.js";
 
@@ -642,6 +644,7 @@ export type { CreateConversationThread, AppendConversationMessage } from "./conv
 export type { ConversationPage, ConversationThreadQuery, ConversationMessageQuery } from "./conversations/ConversationPage.js";
 export type { IConversationStore } from "./conversations/IConversationStore.js";
 export { ConversationContract } from "./conversations/ConversationContract.js";
+export type { ChatResponse } from "./conversations/ChatResponse.js";
 export { ConversationError } from "./errors/ConversationError.js";
 export type { ConversationErrorCode } from "./errors/ConversationError.js";
 export type { ConversationStatements } from "./persistence/conversations/ConversationStatements.js";

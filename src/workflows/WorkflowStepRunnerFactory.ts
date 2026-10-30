@@ -12,11 +12,13 @@ import { ExecutionOutcomeContract } from "../contracts/validation/ExecutionOutco
 import { StepInputPolicyInputContract } from "./StepInputPolicyInputContract.js";
 import { StepResultAcceptanceContract } from "./StepResultAcceptanceContract.js";
 import { StepAttemptReceiptContract } from "./StepAttemptReceiptContract.js";
+import type { IScopedDebugRecorder } from "../events/debug/IScopedDebugRecorder.js";
 export class WorkflowStepRunnerFactory implements IWorkflowStepRunnerFactory{
  constructor(private readonly definitions:WorkflowDefinitionRegistry,
     private readonly executors:ExecutorRegistry,
     private readonly policies:StepPolicyRegistry,
     private readonly ids:IIdGenerator,
-    private readonly clock:IClock){}
- create(journal:IStepAttemptJournal,verifier:IStepContextVerifier):StepRunner{const json=new JsonValueContract(),outcomes=new ExecutionOutcomeContract(json,json),decisions=new StepResultAcceptanceContract(json);return new StepRunner(this.definitions,this.executors,this.policies,new StepInputPolicyInputContract(json),outcomes,decisions,new StepAttemptReceiptContract(json,outcomes,decisions),verifier,journal,json,this.ids,this.clock);}
+    private readonly clock:IClock,
+    private readonly debug?:IScopedDebugRecorder){}
+ create(journal:IStepAttemptJournal,verifier:IStepContextVerifier):StepRunner{const json=new JsonValueContract(),outcomes=new ExecutionOutcomeContract(json,json),decisions=new StepResultAcceptanceContract(json);return new StepRunner(this.definitions,this.executors,this.policies,new StepInputPolicyInputContract(json),outcomes,decisions,new StepAttemptReceiptContract(json,outcomes,decisions),verifier,journal,json,this.ids,this.clock,this.debug);}
 }

@@ -350,12 +350,50 @@ async function verifyAgentDebugEvents(): Promise<void> {
     "operation.completed:workflow.step",
     "operation.completed:agent.run",
     "progress.reported:agent.outcome",
+    "progress.reported:workflow.plan",
+    "progress.reported:step.attempt",
+    "operation.started:executor.run",
+    "progress.reported:executor.outcome",
+    "policy.applied:step.acceptance",
+    "operation.started:mind-unit.run",
+    "operation.started:session.turn",
+    "progress.reported:session.action",
+    "policy.applied:session.acceptance",
+    "policy.applied:workflow.completion",
   ])
     if (!seen.includes(expected)) throw new Error(`Agent debug events must include ${expected}.`);
+  // Spans nest: a tool call sits in a turn, in the mind unit, in the executor, in the step, in the run.
+  const parents = new Map(
+    events
+      .filter((event) => event.type === "operation.started")
+      .map((event) => [event.trace.spanId, event] as const),
+  );
+  const toolCall = events.find((event) => event.payload.operation === "tool.call");
+  const chain: string[] = [];
+  for (let span = toolCall && parents.get(toolCall.trace.spanId); span; span = parents.get(span.trace.parentSpanId ?? ""))
+    chain.push(span.payload.operation ?? "");
+  if (chain.join(">") !== "tool.call>session.turn>mind-unit.run>executor.run>workflow.step>agent.run")
+    throw new Error(`Agent debug spans must nest, got ${chain.join(">")}.`);
+  if (!toolCall?.identity.sessionId || !toolCall.identity.stepRunId)
+    throw new Error("Tool call events must carry their session and step run identity.");
   if (events.some((event) => event.identity.runId !== result.runId))
     throw new Error("Agent debug events must carry the run identity.");
   if (events.at(-1)?.payload.nextState !== "completed")
     throw new Error("The agent outcome event must report the final status.");
+  // Every turn describes its context window: sizes by origin and the budget, never content.
+  const windows = events.filter((event) => event.payload.operation === "context.window");
+  const turns = events.filter((event) => event.type === "operation.started" && event.payload.operation === "session.turn");
+  if (windows.length !== turns.length || windows.length === 0)
+    throw new Error("Each session turn must report its context window.");
+  const second = windows[1]?.payload;
+  if (!second?.metrics || second.metrics.contextTokens !== undefined && second.metrics.contextTokens <= 0 ||
+      !(second.metrics.taskBytes! > 0) || !(second.metrics.observationBytes! > 0) || !(second.metrics.assistantBytes! > 0) ||
+      !second.relatedRefs?.some((ref) => ref.startsWith("added:tool.")))
+    throw new Error("Context windows must measure the task, the model's actions and tool observations.");
+  if (events.some((event) => event.payload.operation === "context.window" && JSON.stringify(event.payload).includes("Traced?")))
+    throw new Error("Context window events must not carry message content.");
+  if (!seen.includes("result.persisted:artifacts.collected"))
+    throw new Error("Agent runs must report the artifacts they collected.");
   const quiet = await new ResearchFixture().create().run({ question: "Untraced?" });
   if (quiet.result?.answer !== "42") throw new Error("Agents without debug must still run.");
 }

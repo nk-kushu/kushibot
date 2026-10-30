@@ -19,16 +19,47 @@ import { SummaryProposalContract } from "./SummaryProposalContract.js";
 import { JsonValueContract } from "../../../persistence/JsonValueContract.js";
 import { ExecutionBoundaryGuard } from "../../../execution-control/ExecutionBoundaryGuard.js";
 import { ContextCompressionError } from "../../../errors/ContextCompressionError.js";
+import type { IScopedDebugRecorder } from "../../../events/debug/IScopedDebugRecorder.js";
+import { NoopDebugRecorder } from "../../../events/debug/NoopDebugRecorder.js";
 export class ContextCompressionService {
   constructor(private readonly inputContract: ContextCompositionInputContract, private readonly snapshots: IContextSnapshotVerifier,
     private readonly policy: IPolicy<CompressionPolicyInput, CompressionDecision>, private readonly provider: IContextSummaryProvider,
     private readonly acceptance: ISummaryAcceptanceVerifier, private readonly store: IContextSummaryStore,
     private readonly stable: StableContextFormatter, private readonly dynamic: DynamicContextFormatter,
     private readonly sizer: IModelInputSizer, private readonly json: JsonValueContract, private readonly clock: IClock,
-    private readonly maxSummaryBytes: number) {
+    private readonly maxSummaryBytes: number,
+    /** Reports what was summarized and the measured saving; records nothing by default. */
+    private readonly debug: IScopedDebugRecorder = new NoopDebugRecorder()) {
     if (!Number.isSafeInteger(maxSummaryBytes) || maxSummaryBytes < 1 || maxSummaryBytes > 8192) throw new ContextCompressionError();
   }
   async compress(raw: ContextCompositionInput, context: IExecutionContext): Promise<ContextCompressionOutcome> {
+    return this.debug.operation("context.compress", async () => {
+      const outcome = await this.run(raw, context);
+      const artifact = outcome.status === "prepared" ? outcome.artifact : "savedArtifact" in outcome ? outcome.savedArtifact : undefined;
+      this.debug.event(outcome.status === "prepared" ? "policy.applied" : "progress.reported", outcome.status === "prepared" ? "info" : "warn", {
+        operation: "context.compressed",
+        nextState: outcome.status,
+        ...(outcome.status === "unchanged" && /^[A-Z][A-Z0-9_]{0,63}$/.test(outcome.code) ? { code: outcome.code } : {}),
+        ...(outcome.status === "stopped" ? { code: outcome.reason.code.toUpperCase().replace(/[^A-Z0-9_]/g, "_") } : {}),
+        relatedRefs: [
+          ...(outcome.status === "prepared" ? outcome.replacedIds.map(id => `replaced:${id}`) : []),
+          ...(outcome.status === "prepared" ? [`summary:${outcome.fragment.id}`] : []),
+          ...(artifact ? [`artifact:${artifact.artifactId}`] : []),
+        ].slice(0, 32).map(ref => ref.slice(0, 256)),
+        ...(outcome.status === "prepared" ? { count: outcome.replacedIds.length, metrics: {
+          replaced: outcome.replacedIds.length,
+          summaryPoints: outcome.summary.points.length,
+          beforeTokens: outcome.measurement.beforeInputTokenUpperBound,
+          afterTokens: outcome.measurement.afterInputTokenUpperBound,
+          beforeBytes: outcome.measurement.beforeMessageBytes,
+          afterBytes: outcome.measurement.afterMessageBytes,
+          summaryBytes: new TextEncoder().encode(outcome.fragment.text).byteLength,
+        } } : {}),
+      });
+      return outcome;
+    }, { relatedRefs: [`snapshot:${String(raw?.snapshotRef ?? "").slice(0, 200)}`] });
+  }
+  private async run(raw: ContextCompositionInput, context: IExecutionContext): Promise<ContextCompressionOutcome> {
     const checked = await this.inputContract.validate(raw); if (!checked.valid) throw new ContextCompressionError();
     const original = checked.value;
     if (original.scope.scopeId !== context.scope.scopeId || original.scope.projectId !== context.scope.projectId || original.scope.workspaceId !== context.scope.workspaceId || !/^[a-zA-Z0-9_.:-]{1,128}$/.test(context.identity.operationId)) throw new ContextCompressionError();

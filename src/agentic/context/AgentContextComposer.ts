@@ -17,18 +17,52 @@ import { DynamicContextFormatter } from "./DynamicContextFormatter.js";
 import { ExecutionBoundaryGuard } from "../../execution-control/ExecutionBoundaryGuard.js";
 import { ModelRequestValidator } from "../model/ModelRequestValidator.js";
 import { ContextCompositionError } from "../../errors/ContextCompositionError.js";
+import type { IScopedDebugRecorder } from "../../events/debug/IScopedDebugRecorder.js";
+import { NoopDebugRecorder } from "../../events/debug/NoopDebugRecorder.js";
 export class AgentContextComposer {
   private readonly profile: ModelProfile; private readonly limits: ContextLimits;
   constructor(profile: ModelProfile, limits: ContextLimits, private readonly contract: ContextCompositionInputContract,
     private readonly verifier: IContextSnapshotVerifier, private readonly policy: IPolicy<ContextPolicyInput, ContextPolicyDecision>,
     private readonly stable: StableContextFormatter, private readonly dynamic: DynamicContextFormatter,
-    private readonly sizer: IModelInputSizer, private readonly validator: ModelRequestValidator, private readonly clock: IClock) {
+    private readonly sizer: IModelInputSizer, private readonly validator: ModelRequestValidator, private readonly clock: IClock,
+    /** Reports which fragments were kept, omitted or dropped to fit; records nothing by default. */
+    private readonly debug: IScopedDebugRecorder = new NoopDebugRecorder()) {
     if (![limits.maxInputTokens, limits.maxOutputTokens, limits.maxRequestBytes].every(value => Number.isSafeInteger(value) && value > 0) ||
         !Number.isSafeInteger(limits.maxOptionalFragments) || limits.maxOptionalFragments < 0 || limits.maxOptionalFragments > 32 ||
         limits.maxOutputTokens > profile.maxOutputTokens || limits.maxInputTokens > profile.contextTokens - limits.maxOutputTokens || limits.maxRequestBytes > profile.maxRequestBytes) throw new ContextCompositionError();
     this.profile = Object.freeze({ ...profile }); this.limits = Object.freeze({ ...limits });
   }
   async compose(raw: ContextCompositionInput, context: IExecutionContext): Promise<ContextCompositionOutcome> {
+    return this.debug.operation("context.compose", async () => {
+      const outcome = await this.build(raw, context);
+      const ready = outcome.status === "ready" ? outcome.context : null;
+      this.debug.event(ready ? "policy.applied" : "progress.reported", ready ? "debug" : "warn", {
+        operation: "context.composed",
+        nextState: outcome.status,
+        ...("code" in outcome ? { code: outcome.code } : {}),
+        ...(ready ? {
+          count: ready.included.length,
+          relatedRefs: [
+            ...ready.included.map(fragment => `include:${fragment.id}`),
+            ...ready.droppedForSizeIds.map(id => `dropped:${id}`),
+            ...ready.omittedOptionalIds.filter(id => !ready.droppedForSizeIds.includes(id)).map(id => `omitted:${id}`),
+          ].slice(0, 32).map(ref => ref.slice(0, 256)),
+          metrics: {
+            included: ready.included.length,
+            omitted: ready.omittedOptionalIds.length,
+            droppedForSize: ready.droppedForSizeIds.length,
+            tokenUpperBound: ready.request.inputTokenUpperBound,
+            maxInputTokens: this.limits.maxInputTokens,
+            requestBytes: new TextEncoder().encode(JSON.stringify(ready.request)).byteLength,
+            maxRequestBytes: this.limits.maxRequestBytes,
+            messages: ready.request.messages.length,
+          },
+        } : {}),
+      });
+      return outcome;
+    }, { relatedRefs: [`snapshot:${String(raw?.snapshotRef ?? "").slice(0, 200)}`] });
+  }
+  private async build(raw: ContextCompositionInput, context: IExecutionContext): Promise<ContextCompositionOutcome> {
     const checked = await this.contract.validate(raw); if (!checked.valid) throw new ContextCompositionError();
     const input = checked.value;
     if (input.scope.scopeId !== context.scope.scopeId || input.scope.projectId !== context.scope.projectId || input.scope.workspaceId !== context.scope.workspaceId) throw new ContextCompositionError();

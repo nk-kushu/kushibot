@@ -53,7 +53,7 @@ export class WorkflowEngine{
    if(snapshot.lifecycle.pendingOperationRefs.length>0){await this.store.mutate(run=>run.interrupt(owner));return this.present(await this.store.read());}
    const aggregate=await WorkflowRun.restore(snapshot);
    const unfinished=snapshot.attempts.find(attempt=>attempt.receipt===null);
-   if(unfinished!==undefined){const execution:IExecutionContext=Object.freeze({...context,identity:Object.freeze({...context.identity,operationId:unfinished.claim.operationId,stepRunId:unfinished.claim.stepRunId,parentOperationId:unfinished.claim.commandId})});const result=await this.traced("workflow.step.resume",unfinished.claim.step.id,()=>runner.resume(unfinished,execution));if(result.status==="pending"){await this.store.mutate(run=>run.interrupt(owner));return this.present(await this.store.read());}if(result.status==="blocked")return this.stop(owner,{code:"no-progress",message:"Recovered attempt could not advance."});continue;}
+   if(unfinished!==undefined){const execution:IExecutionContext=Object.freeze({...context,identity:Object.freeze({...context.identity,operationId:unfinished.claim.operationId,stepRunId:unfinished.claim.stepRunId,parentOperationId:unfinished.claim.commandId})});const result=await this.traced("workflow.step.resume",unfinished.claim.step.id,execution,()=>runner.resume(unfinished,execution));if(result.status==="pending"){await this.store.mutate(run=>run.interrupt(owner));return this.present(await this.store.read());}if(result.status==="blocked")return this.stop(owner,{code:"no-progress",message:"Recovered attempt could not advance."});continue;}
    const trigger=aggregate.unprocessed();
    if(trigger!==null){
     let chosen:string|null=null;
@@ -65,7 +65,9 @@ export class WorkflowEngine{
         Array.isArray(decision.value)||
         Object.keys(decision.value).length!==1||
         typeof (decision.value as Record<string,unknown>).take!=="boolean")throw new WorkflowRunError();
-     if((decision.value as Record<string,unknown>).take===true){chosen=transition.id;break;}
+     const take=(decision.value as Record<string,unknown>).take===true;
+     this.debug.event("policy.recommended",take?"info":"debug",{operation:"workflow.transition",nextState:take?"taken":"skipped",relatedRefs:[`transition:${transition.id}`,`from:${transition.fromStepId}`,`to:${transition.toStepId}`,`policy:${transition.policy.id}@${transition.policy.version}`]});
+     if(take){chosen=transition.id;break;}
     }
     const afterPolicy=guard.check();if(afterPolicy!==null)return this.stop(owner,afterPolicy);
     if(chosen===null){await this.store.mutate(run=>run.consume(owner,snapshot.revision,trigger.attemptId));continue;}
@@ -84,6 +86,7 @@ export class WorkflowEngine{
         checked.value===null||
         typeof checked.value!=="object"||
         Array.isArray(checked.value))throw new WorkflowRunError();const decision=checked.value as Record<string,unknown>;
+    this.debug.event("policy.applied",decision.accepted===true?"info":"warn",{operation:"workflow.completion",nextState:decision.accepted===true?"accepted":"rejected",...(typeof decision.code==="string"&&/^[A-Z][A-Z0-9_]{0,63}$/.test(decision.code)?{code:decision.code}:{}),...(typeof decision.message==="string"?{summary:decision.message}:{}),relatedRefs:[`policy:${snapshot.completionPolicy.id}@${snapshot.completionPolicy.version}`,`steps:${snapshot.accepted.length}/${snapshot.definition.steps.length}`]});
     if(decision.accepted===true&&Object.keys(decision).length===1){const after=guard.check();if(after!==null)return this.stop(owner,after);await this.store.mutate(run=>{const atCommit=guard.check();if(atCommit!==null)run.stop(owner,atCommit);else run.complete(owner,snapshot.revision);});return this.present(await this.store.read());}
     if(decision.accepted!==false||
         Object.keys(decision).length!==3||
@@ -95,24 +98,25 @@ export class WorkflowEngine{
     await this.store.mutate(run=>run.rejectCompletion(owner,snapshot.revision,{accepted:false,code:decision.code as string,message:decision.message as string},guard.check()));return this.present(await this.store.read());
    }
    const step=aggregate.ready();
-   if(step===null){const last=snapshot.attempts[snapshot.attempts.length-1]?.outcome;if(last?.status==="failed"){await this.store.mutate(run=>run.fail(owner));return this.present(await this.store.read());}return this.stop(owner,last?.status==="stopped"?last.reason:{code:"no-progress",message:"No ready step or declared correction can advance the retained results."});}
+   if(step===null){const last=snapshot.attempts[snapshot.attempts.length-1]?.outcome;if(last?.status==="failed"){this.debug.event("progress.reported","error",{operation:"workflow.failed",nextState:"failed",summary:"The last step attempt failed and no correction applies."});await this.store.mutate(run=>run.fail(owner));return this.present(await this.store.read());}return this.stop(owner,last?.status==="stopped"?last.reason:{code:"no-progress",message:"No ready step or declared correction can advance the retained results."});}
    const proposedStepRunId=this.ids.nextId();
    const stepRunId=await this.store.mutate(run=>run.openStep(owner,step.id,proposedStepRunId));
    if(stepRunId===null)return this.stop(owner,{code:"limit-reached",message:"Workflow or step attempt allowance is exhausted."});
    const view=(await WorkflowRun.restore(await this.store.read())).view(step.id);
    const execution:IExecutionContext=Object.freeze({...context,identity:Object.freeze({...context.identity,stepRunId,operationId:this.ids.nextId(),parentOperationId:context.identity.operationId})});
-   const result=await this.traced("workflow.step",step.id,()=>runner.run({workflow:{id:snapshot.definition.id,version:snapshot.definition.version},stepId:step.id,view},execution));
+   const result=await this.traced("workflow.step",step.id,execution,()=>runner.run({workflow:{id:snapshot.definition.id,version:snapshot.definition.version},stepId:step.id,view},execution));
    if(result.status==="pending"){await this.store.mutate(run=>run.interrupt(owner));return this.present(await this.store.read());}
    if(result.status==="blocked")return this.stop(owner,{code:"no-progress",message:"StepRunner blocked the attempt: "+result.code});
   }
   return this.stop(owner,{code:"no-progress",message:"Workflow orchestration boundary limit reached."});
  }
- private async traced(operation:string,stepId:string,work:()=>Promise<StepRunOutcome>):Promise<StepRunOutcome>{
-  const result=await this.debug.operation(operation,work,{relatedRefs:[`step:${stepId}`]});
-  this.debug.event("progress.reported",result.status==="recorded"?"debug":"warn",{operation:`${operation}.outcome`,nextState:result.status,relatedRefs:[`step:${stepId}`]});
+ private async traced(operation:string,stepId:string,execution:IExecutionContext,work:()=>Promise<StepRunOutcome>):Promise<StepRunOutcome>{
+  const result=await this.debug.operation(operation,work,{relatedRefs:[`step:${stepId}`]},execution.identity);
+  const accepted=result.status==="recorded"?result.receipt.acceptance.status:null;
+  this.debug.event("progress.reported",result.status==="recorded"&&accepted==="accepted"?"debug":"warn",{operation:`${operation}.outcome`,nextState:result.status,...(result.status==="blocked"?{code:result.code.replace(/[^A-Z0-9_]/g,"_")}:{}),relatedRefs:[`step:${stepId}`,...(accepted===null?[]:[`acceptance:${accepted}`])]});
   return result;
  }
- private async stop(owner:string,reason:ExecutionStopReason):Promise<WorkflowEngineOutcome>{await this.store.mutate(run=>run.stop(owner,reason));return this.present(await this.store.read());}
+ private async stop(owner:string,reason:ExecutionStopReason):Promise<WorkflowEngineOutcome>{this.debug.event("progress.reported","warn",{operation:"workflow.stopped",nextState:"stopped",code:reason.code.toUpperCase().replace(/[^A-Z0-9_]/g,"_"),summary:reason.message});await this.store.mutate(run=>run.stop(owner,reason));return this.present(await this.store.read());}
  private present(snapshot:WorkflowRunSnapshot):WorkflowEngineOutcome{
   if(snapshot.outcome!==null)return Object.freeze({status:"finished",outcome:snapshot.outcome});
   const pending=[...new Set([...snapshot.lifecycle.pendingOperationRefs,...snapshot.attempts.filter(attempt=>attempt.receipt===null).map(attempt=>attempt.claim.operationId)])];

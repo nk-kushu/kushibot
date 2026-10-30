@@ -31,6 +31,10 @@ export async function checkDebugRecorder(): Promise<void> {
   await publisher.drain();
   const payload = events[events.length - 1].payload;
   if (JSON.stringify(payload) !== '{"count":1}' || JSON.stringify(events).includes("private")) throw new Error("Payload leakage.");
+  // Metrics keep only finite numbers under safe names: measurements, never content.
+  recorder.event("progress.reported", "debug", { metrics: { bytes: 12, "obs.tool.read_file": 7, text: "private", Bad: 1, nan: Number.NaN } });
+  await publisher.drain();
+  if (JSON.stringify(events[events.length - 1].payload) !== '{"metrics":{"bytes":12,"obs.tool.read_file":7}}') throw new Error("Metrics were not sanitized.");
   logging.setEnabled(false);
   logging.setLevel("error");
   const before = events.length;

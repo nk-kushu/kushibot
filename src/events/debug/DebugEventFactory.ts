@@ -16,18 +16,22 @@ export class DebugEventFactory {
     private readonly clock: IClock, private readonly ids: IIdGenerator, private readonly sanitizer: IDebugPayloadSanitizer, private readonly maxEventBytes = 16384) {
     this.scope = Object.freeze({ ...scope }); this.identity = Object.freeze({ ...identity });
   }
-  create(channel: "diagnostic" | "lifecycle", type: DebugEventType, level: LogLevel, payload: unknown, trace: TraceContext): DebugEvent {
+  /** `identity` replaces the recorder's own identity for this event, e.g. with a step run's. */
+  create(channel: "diagnostic" | "lifecycle", type: DebugEventType, level: LogLevel, payload: unknown, trace: TraceContext, identity?: ExecutionIdentity): DebugEvent {
     if ((channel === "lifecycle") !== (type === "state.persisted")) throw new ConfigurationError("Lifecycle channel requires a state.persisted event.");
     const occurredAtEpochMs = this.clock.nowEpochMs();
     if (!Number.isSafeInteger(occurredAtEpochMs) || occurredAtEpochMs < 0 || occurredAtEpochMs > 8640000000000000) {
       throw new ConfigurationError("Invalid debug event timestamp.");
     }
     const event: DebugEvent = Object.freeze({ schemaVersion: 1, eventId: this.ids.nextId(), channel, type, level, occurredAtEpochMs,
-      producerId: this.producerId, scope: this.scope, identity: this.identity,
+      producerId: this.producerId, scope: this.scope, identity: identity === undefined ? this.identity : this.defined(identity),
       trace: Object.freeze({ ...trace }), payload: this.sanitizer.sanitize(payload) });
     if (!Number.isSafeInteger(this.maxEventBytes) || this.maxEventBytes < 1 || new TextEncoder().encode(JSON.stringify(event)).byteLength > this.maxEventBytes) {
       throw new ConfigurationError("Debug event exceeds its byte limit.");
     }
     return event;
+  }
+  private defined(identity: ExecutionIdentity): ExecutionIdentity {
+    return Object.freeze(Object.fromEntries(Object.entries(identity).filter(([, value]) => value !== undefined))) as ExecutionIdentity;
   }
 }

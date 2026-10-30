@@ -41,6 +41,7 @@ export class AgentRunRuntime {
       new AgentTaskSessionProvider(this, bindings),
       result,
       this.ids,
+      this.debug,
     );
   }
   createTurn(instructions: string, input: JsonValue): AgentModelTurn {
@@ -57,6 +58,7 @@ export class AgentRunRuntime {
       ),
       this.profile,
       this.modelTimeoutMs,
+      this.debug,
     );
   }
 }

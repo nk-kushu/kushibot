@@ -30,24 +30,35 @@ export class AgentTaskSessionProvider<TResult> implements IAgentTaskSessionProvi
     const turn = this.runtime.createTurn(binding.instructions, checked.value);
     this.runtime.debug.event("progress.reported", "debug", {
       operation: "agent.session",
-      relatedRefs: [`session:${sessionId}`],
+      relatedRefs: [
+        `session:${sessionId}`,
+        `mode:${request.mode}`,
+        `max-turns:${this.runtime.maxTurns}`,
+      ],
+      // What this session starts from: its instructions and the task input handed to it.
+      metrics: {
+        instructionsBytes: new TextEncoder().encode(binding.instructions).byteLength,
+        inputBytes: new TextEncoder().encode(JSON.stringify(checked.value)).byteLength,
+        maxTurns: this.runtime.maxTurns,
+      },
     });
     return {
       create: async () =>
-        new AgenticSession<TResult>(
+        new AgenticSession<TResult>({
           sessionId,
-          this.runtime.maxTurns,
-          turn,
-          new DebugRecordingToolCall(binding.tools, this.runtime.debug),
-          new AgentActionParser(json),
+          maxTurns: this.runtime.maxTurns,
+          model: turn,
+          tools: new DebugRecordingToolCall(binding.tools, this.runtime.debug),
+          parser: new AgentActionParser(json),
           result,
-          binding.acceptance,
-          this.runtime.stores.journal,
-          this.runtime.stores.usage,
-          this.runtime.budgetScopeId,
-          this.runtime.ids,
-          this.runtime.clock,
-        ),
+          acceptance: binding.acceptance,
+          journal: this.runtime.stores.journal,
+          ledger: this.runtime.stores.usage,
+          budgetScopeId: this.runtime.budgetScopeId,
+          ids: this.runtime.ids,
+          clock: this.runtime.clock,
+          debug: this.runtime.debug,
+        }),
     };
   }
 }

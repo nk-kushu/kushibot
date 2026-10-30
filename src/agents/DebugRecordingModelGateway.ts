@@ -17,10 +17,12 @@ export class DebugRecordingModelGateway implements IModelGateway {
         relatedRefs: [
           `model:${reply.providerId}/${reply.modelId}`,
           ...(reply.usage ? [`inputTokens:${reply.usage.inputTokens}`, `outputTokens:${reply.usage.outputTokens}`] : []),
+          ...(reply.usage?.cachedInputTokens ? [`cachedInputTokens:${reply.usage.cachedInputTokens}`] : []),
+          ...(reply.usage?.reasoningTokens ? [`reasoningTokens:${reply.usage.reasoningTokens}`] : []),
           ...(reply.errorCode ? [`error:${reply.errorCode}`] : []),
         ],
       });
       return reply;
-    }, { count: request.messages.length, relatedRefs: [`operation:${control.operationId}`] });
+    }, { count: request.messages.length, relatedRefs: [`operation:${control.operationId}`, `messages:${request.messages.length}`] });
   }
 }

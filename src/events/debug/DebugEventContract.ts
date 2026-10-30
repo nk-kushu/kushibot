@@ -33,7 +33,7 @@ export class DebugEventContract implements IResultContract<DebugEvent> {
     return { valid: true, value: data as DebugEvent };
   }
   private payload(value: unknown): boolean {
-    if (!this.record(value) || Object.keys(value).some(key => !["operation", "summary", "code", "count", "durationMs", "revision", "previousState", "nextState", "relatedRefs"].includes(key))) return false;
+    if (!this.record(value) || Object.keys(value).some(key => !["operation", "summary", "code", "count", "durationMs", "revision", "previousState", "nextState", "relatedRefs", "metrics"].includes(key))) return false;
     if ("operation" in value && (typeof value.operation !== "string" || !/^[a-z][a-z0-9_.-]{0,127}$/.test(value.operation))) return false;
     if ("summary" in value && !this.text(value.summary, 512)) return false;
     if ("code" in value && (typeof value.code !== "string" || !/^[A-Z][A-Z0-9_]{0,63}$/.test(value.code))) return false;
@@ -41,6 +41,12 @@ export class DebugEventContract implements IResultContract<DebugEvent> {
     if ("durationMs" in value && (typeof value.durationMs !== "number" || !Number.isFinite(value.durationMs) || value.durationMs < 0)) return false;
     for (const key of ["previousState", "nextState"]) if (key in value && (typeof value[key] !== "string" || !/^[a-z][a-z-]{0,63}$/.test(String(value[key])))) return false;
     if ("relatedRefs" in value && (!Array.isArray(value.relatedRefs) || value.relatedRefs.length > 32 || !value.relatedRefs.every(item => this.text(item, 256)))) return false;
+    if ("metrics" in value) {
+      const metrics = value.metrics;
+      if (!this.record(metrics)) return false;
+      const entries = Object.entries(metrics);
+      if (entries.length > 32 || entries.some(([key, item]) => !/^[a-z][a-zA-Z0-9_.-]{0,63}$/.test(key) || typeof item !== "number" || !Number.isFinite(item))) return false;
+    }
     return true;
   }
   private record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }

@@ -18,6 +18,6 @@ export class DebugRecordingToolCall implements IAgentToolCall {
         relatedRefs: [`tool:${request.toolId}`, ...(outcome.status === "completed" && outcome.replayed ? ["replayed"] : [])],
       });
       return outcome;
-    }, { relatedRefs: [`tool:${request.toolId}`, `operation:${request.operationId}`] });
+    }, { relatedRefs: [`tool:${request.toolId}`, `operation:${request.operationId}`] }, context.identity);
   }
 }

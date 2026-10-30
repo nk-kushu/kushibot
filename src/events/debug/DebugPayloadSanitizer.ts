@@ -16,6 +16,7 @@ export class DebugPayloadSanitizer implements IDebugPayloadSanitizer {
     const result: {
       operation?: string; summary?: string; code?: string; count?: number; durationMs?: number;
       revision?: number; previousState?: string; nextState?: string; relatedRefs?: readonly string[];
+      metrics?: Readonly<Record<string, number>>;
     } = {};
     const operation = this.field(descriptors, "operation");
     if (typeof operation === "string" && /^[a-z][a-z0-9_.-]{0,127}$/.test(operation)) result.operation = operation;
@@ -36,6 +37,12 @@ export class DebugPayloadSanitizer implements IDebugPayloadSanitizer {
     const refs = this.field(descriptors, "relatedRefs");
     if (Array.isArray(refs) && refs.length <= 32 && refs.every(item => this.text(item, 256))) {
       result.relatedRefs = Object.freeze([...refs]);
+    }
+    const metrics = this.field(descriptors, "metrics");
+    if (typeof metrics === "object" && metrics !== null && !Array.isArray(metrics)) {
+      const entries = Object.entries(metrics).filter(([key, item]) =>
+        /^[a-z][a-zA-Z0-9_.-]{0,63}$/.test(key) && typeof item === "number" && Number.isFinite(item));
+      if (entries.length > 0 && entries.length <= 32) result.metrics = Object.freeze(Object.fromEntries(entries));
     }
     return Object.freeze(result);
   }

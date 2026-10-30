@@ -20,6 +20,8 @@ import { ExecutionOutcomeContract } from "../contracts/validation/ExecutionOutco
 import { JsonValueContract } from "../persistence/JsonValueContract.js";
 import { ExecutionBoundaryGuard } from "../execution-control/ExecutionBoundaryGuard.js";
 import { StepExecutionError } from "../errors/StepExecutionError.js";
+import type { IScopedDebugRecorder } from "../events/debug/IScopedDebugRecorder.js";
+import { NoopDebugRecorder } from "../events/debug/NoopDebugRecorder.js";
 export class StepRunner{
   constructor(private readonly definitions:WorkflowDefinitionRegistry,
     private readonly executors:ExecutorRegistry,
@@ -32,7 +34,9 @@ export class StepRunner{
     private readonly journal:IStepAttemptJournal,
     private readonly json:JsonValueContract,
     private readonly ids:IIdGenerator,
-    private readonly clock:IClock){}
+    private readonly clock:IClock,
+    /** Traces the attempt, the executor it dispatches and the acceptance decision; records nothing by default. */
+    private readonly debug:IScopedDebugRecorder=new NoopDebugRecorder()){}
   async run(request:StepRunRequest,context:IExecutionContext):Promise<StepRunOutcome>{
     context=Object.freeze({...context,identity:Object.freeze({...context.identity}),scope:Object.freeze({...context.scope})});
     if(![context.identity.operationId,context.identity.runId,context.identity.stepRunId].every(value=>typeof value==="string"&&/^[A-Za-z0-9_.:-]{1,128}$/.test(value))||
@@ -57,6 +61,7 @@ export class StepRunner{
     if(admission.status==="existing")return this.existing(admission.outcome,claim);
     const attemptNumber=admission.attemptNumber;if(!Number.isSafeInteger(attemptNumber)||attemptNumber<1||attemptNumber>step.maxAttempts)throw new StepExecutionError();
     const execution:IExecutionContext=Object.freeze({...context,scope:claim.scope,identity:Object.freeze({...context.identity,operationId:claim.operationId,parentOperationId:claim.commandId})});
+    this.debug.event("progress.reported","info",{operation:"step.attempt",count:attemptNumber,relatedRefs:[`step:${step.id}`,`attempt:${attemptNumber}/${step.maxAttempts}`,`executor:${step.executor.id}@${step.executor.version}`,`input-policy:${step.inputPolicy.id}@${step.inputPolicy.version}`,`acceptance-policy:${step.acceptancePolicy.id}@${step.acceptancePolicy.version}`]});
     return this.advance(claim,attemptNumber,execution,null,null);
   }
   async resume(attempt:WorkflowStepAttempt,context:IExecutionContext):Promise<StepRunOutcome>{
@@ -82,7 +87,9 @@ export class StepRunner{
     const dispatchStop=guard.check();
     if(dispatchStop!==null){const stopped:ExecutionOutcome<JsonValue>={status:"stopped",reason:dispatchStop,partial:{summary:"Prepared input retained; executor did not start.",evidenceRefs:[],artifactRefs:[],unresolved:["Executor did not start."]},pendingOperationRefs:[]};await this.journal.recordOutcome(claim.attemptId,claim.ownerToken,stopped);return this.finish(claim,attemptNumber,stopped,{status:"not-evaluated",code:"DISPATCH_BLOCKED",message:"Controls prevented executor invocation."},execution);}
     const registered=this.executors.resolve(step.executor.id,step.executor.version);
-    outcome=await this.outcomes.validate(await registered.execute(input.value,execution));if(!outcome.valid)throw new StepExecutionError();
+    const executorRef=`executor:${registered.metadata.id}@${registered.metadata.version}`;
+    outcome=await this.outcomes.validate(await this.debug.operation("executor.run",()=>registered.execute(input.value,execution),{count:attemptNumber,relatedRefs:[executorRef,`step:${step.id}`,`input:${registered.metadata.inputContractId}@${registered.metadata.inputContractVersion}`,`result:${registered.metadata.resultContractId}@${registered.metadata.resultContractVersion}`]},execution.identity));if(!outcome.valid)throw new StepExecutionError();
+    this.debug.event("progress.reported",outcome.value.status==="completed"?"info":"warn",{operation:"executor.outcome",nextState:outcome.value.status,...(outcome.value.status==="failed"?{code:this.code(outcome.value.error.code)}:{}),...(outcome.value.status==="stopped"?{code:this.code(outcome.value.reason.code)}:{}),relatedRefs:[executorRef]});
     await this.journal.recordOutcome(claim.attemptId,claim.ownerToken,outcome.value);
     }
     if(outcome.value.status!=="completed")return this.finish(claim,attemptNumber,outcome.value,{status:"not-evaluated",code:"EXECUTOR_INCOMPLETE",message:"Executor returned stopped or failed work."},execution);
@@ -98,6 +105,7 @@ export class StepRunner{
     return this.finish(claim,attemptNumber,outcome.value,acceptance,execution);
   }
   private async finish(claim:StepAttemptClaim,attemptNumber:number,outcome:ExecutionOutcome<JsonValue>,acceptance:StepResultAcceptance,context:IExecutionContext):Promise<StepRunOutcome>{
+    this.debug.event("policy.applied",acceptance.status==="accepted"?"info":"warn",{operation:"step.acceptance",nextState:acceptance.status,...(acceptance.status!=="accepted"?{code:this.code(acceptance.code),summary:acceptance.message}:{}),relatedRefs:[`step:${claim.step.id}`,`acceptance-policy:${claim.step.acceptancePolicy.id}@${claim.step.acceptancePolicy.version}`,`attempt:${attemptNumber}`]});
     const expected=await this.outcomes.validate(outcome);if(!expected.valid)throw new StepExecutionError();
     const receipt=await this.receipts.validate(await this.journal.commit(claim.attemptId,claim.ownerToken,acceptance,context));if(!receipt.valid)throw new StepExecutionError();
     this.match(receipt.value,claim);if(receipt.value.attemptId!==claim.attemptId||
@@ -127,5 +135,7 @@ export class StepRunner{
         receipt.workflow.version!==claim.workflow.version||
         receipt.viewRef!==claim.view.viewRef||
         (["id","version","inputContractId","inputContractVersion","resultContractId","resultContractVersion"] as const).some(key=>receipt.executor[key]!==claim.step.executor[key]))throw new StepExecutionError();}
+  /** A debug-payload code: upper snake case. */
+  private code(value:string):string{const code=value.toUpperCase().replace(/[^A-Z0-9_]/g,"_").replace(/^[^A-Z]+/,"").slice(0,64);return code||"UNKNOWN";}
   private safeBlocked(code:string):StepRunOutcome{if(!/^[A-Z0-9_:-]{1,128}$/.test(code))throw new StepExecutionError();return {status:"blocked",code};}
 }
