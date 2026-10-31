@@ -1,3 +1,4 @@
+import { DebugContentRecorder } from "../../events/debug/DebugContentRecorder.js";
 import type { IAgentTurn } from "./IAgentTurn.js";
 import type { IAgenticSessionOptions } from "./IAgenticSessionOptions.js";
 import type { IAgentToolCall } from "./IAgentToolCall.js";
@@ -84,6 +85,7 @@ export class AgenticSession<TResult> {
     this.pending.delete(modelContext.identity.operationId);
     if (reply.status === "stopped") return this.finish(this.stopped(reply.reason.code, reply.reason.message), context);
     const action = await this.parser.parse(reply.text);
+    new DebugContentRecorder(this.debug).record("action", action);
     this.debug.event("progress.reported", action === null ? "warn" : "info", {
       operation: "session.action",
       nextState: action === null ? "invalid" : action.kind,
@@ -95,8 +97,10 @@ export class AgenticSession<TResult> {
     if (action.kind === "note") {
       const appended = this.notebook.append(action.entry);
       this.notebookEvent(appended);
+      new DebugContentRecorder(this.debug).record("notebook", { appended, entry: action.entry, notebook: this.notebook.snapshot() });
       if (!appended) return this.finish(this.stopped("limit-reached", "Notebook capacity reached."), context);
-      this.observation = { noteRecorded: true }; return null;
+      this.observation = { noteRecorded: true };
+      new DebugContentRecorder(this.debug).record("observation", this.observation); return null;
     }
     if (action.kind === "tool") {
       const toolContext = this.child(context); await this.mark(toolContext, "tool");
@@ -104,15 +108,18 @@ export class AgenticSession<TResult> {
       if (dispatched.status === "uncertain") { this.pending.add(dispatched.operationId); return this.finish(this.stopped("no-progress", "Tool requires reconciliation."), context); }
       const observation: JsonValue = dispatched.status === "completed" ? { operationId: dispatched.observation.operationId, toolId: dispatched.observation.toolId, value: dispatched.observation.value } : dispatched.status === "rejected" ? { rejected: dispatched.code } : { stopped: dispatched.reason.code };
       await this.journal.resolved(toolContext.identity.operationId, observation, toolContext); this.pending.delete(toolContext.identity.operationId); this.observation = observation;
+      new DebugContentRecorder(this.debug).record("observation", observation);
       if (dispatched.status === "stopped") return this.finish(this.stopped(dispatched.reason.code, dispatched.reason.message), context);
       return null;
     }
     const checked = await this.result.validate(action.value);
     if (!checked.valid) {
       this.debug.event("policy.applied", "warn", { operation: "session.acceptance", nextState: "schema-rejected", summary: "The final result failed the result contract; the model is asked to correct it." });
-      this.observation = { correction: "Result schema rejected." }; return null;
+      this.observation = { correction: "Result schema rejected." };
+      new DebugContentRecorder(this.debug).record("observation", this.observation); return null;
     }
     const decision = await this.acceptance.apply({ candidate: checked.value, view: this.view() });
+    new DebugContentRecorder(this.debug).record("acceptance", { candidate: checked.value, decision });
     this.debug.event("policy.applied", decision.accepted ? "info" : "warn", {
       operation: "session.acceptance",
       nextState: decision.accepted ? "accepted" : "rejected",
@@ -122,6 +129,7 @@ export class AgenticSession<TResult> {
     const acceptedStop = guard.check(); if (acceptedStop !== null) return this.finish(this.stopped(acceptedStop.code, acceptedStop.message), context);
     if (decision.accepted) return this.finish({ status: "completed", result: checked.value }, context);
     this.observation = { correction: typeof decision.feedback === "string" ? decision.feedback.slice(0, 1024) : "Acceptance rejected." };
+    new DebugContentRecorder(this.debug).record("observation", this.observation);
     return null;
   }
   /** `notebook.updated`: the session's working memory after a note, measured without its text. */

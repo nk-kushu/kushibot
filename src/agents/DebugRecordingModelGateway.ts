@@ -1,3 +1,4 @@
+import { DebugContentRecorder } from "../events/debug/DebugContentRecorder.js";
 import type { IModelGateway } from "../models/contracts/IModelGateway.js";
 import type { IScopedDebugRecorder } from "../events/debug/IScopedDebugRecorder.js";
 import type { ModelRequest } from "../agentic/model/ModelRequest.js";
@@ -9,7 +10,9 @@ export class DebugRecordingModelGateway implements IModelGateway {
   constructor(private readonly gateway: IModelGateway, private readonly debug: IScopedDebugRecorder) {}
   generate(request: ModelRequest, control: ModelCallControl): Promise<ModelReply> {
     return this.debug.operation("model.call", async () => {
+      new DebugContentRecorder(this.debug).record("request", request);
       const reply = await this.gateway.generate(request, control);
+      new DebugContentRecorder(this.debug).record("reply", reply);
       this.debug.event("progress.reported", reply.status === "completed" ? "debug" : "warn", {
         operation: "model.reply",
         nextState: reply.status,

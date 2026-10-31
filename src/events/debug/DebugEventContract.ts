@@ -33,7 +33,8 @@ export class DebugEventContract implements IResultContract<DebugEvent> {
     return { valid: true, value: data as DebugEvent };
   }
   private payload(value: unknown): boolean {
-    if (!this.record(value) || Object.keys(value).some(key => !["operation", "summary", "code", "count", "durationMs", "revision", "previousState", "nextState", "relatedRefs", "metrics"].includes(key))) return false;
+    if (!this.record(value) || Object.keys(value).some(key => !["content", "operation", "summary", "code", "count", "durationMs", "revision", "previousState", "nextState", "relatedRefs", "metrics"].includes(key))) return false;
+    if ("content" in value && (typeof value.content !== "string" || value.content.length > 1000)) return false;
     if ("operation" in value && (typeof value.operation !== "string" || !/^[a-z][a-z0-9_.-]{0,127}$/.test(value.operation))) return false;
     if ("summary" in value && !this.text(value.summary, 512)) return false;
     if ("code" in value && (typeof value.code !== "string" || !/^[A-Z][A-Z0-9_]{0,63}$/.test(value.code))) return false;

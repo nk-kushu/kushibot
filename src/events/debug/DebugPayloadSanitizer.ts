@@ -14,6 +14,7 @@ export class DebugPayloadSanitizer implements IDebugPayloadSanitizer {
     if (typeof value !== "object" || value === null || Array.isArray(value)) return Object.freeze({});
     const descriptors = Object.getOwnPropertyDescriptors(value);
     const result: {
+      content?: string;
       operation?: string; summary?: string; code?: string; count?: number; durationMs?: number;
       revision?: number; previousState?: string; nextState?: string; relatedRefs?: readonly string[];
       metrics?: Readonly<Record<string, number>>;
@@ -22,6 +23,8 @@ export class DebugPayloadSanitizer implements IDebugPayloadSanitizer {
     if (typeof operation === "string" && /^[a-z][a-z0-9_.-]{0,127}$/.test(operation)) result.operation = operation;
     const summary = this.field(descriptors, "summary");
     if (typeof summary === "string" && this.summaries.has(summary)) result.summary = summary;
+    const content = this.field(descriptors, "content");
+    if (typeof content === "string" && content.length <= 1000) result.content = content;
     const code = this.field(descriptors, "code");
     if (typeof code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(code)) result.code = code;
     for (const key of ["count", "revision"] as const) {

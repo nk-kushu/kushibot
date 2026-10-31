@@ -1,3 +1,7 @@
+import { DebugContentRecorder } from "../../src/events/debug/DebugContentRecorder.js";
+import { DebugEventContract } from "../../src/events/debug/DebugEventContract.js";
+import { JsonValueContract } from "../../src/persistence/JsonValueContract.js";
+import { ExecutionIdentityContract } from "../../src/contracts/runtime/ExecutionIdentityContract.js";
 import { ScopedDebugRecorder } from "../../src/events/debug/ScopedDebugRecorder.js";
 import { LoggingController } from "../../src/events/debug/LoggingController.js";
 import { BoundedDebugPublisher } from "../../src/events/debug/BoundedDebugPublisher.js";
@@ -35,6 +39,15 @@ export async function checkDebugRecorder(): Promise<void> {
   recorder.event("progress.reported", "debug", { metrics: { bytes: 12, "obs.tool.read_file": 7, text: "private", Bad: 1, nan: Number.NaN } });
   await publisher.drain();
   if (JSON.stringify(events[events.length - 1].payload) !== '{"metrics":{"bytes":12,"obs.tool.read_file":7}}') throw new Error("Metrics were not sanitized.");
+  const contentStart = events.length;
+  const request = { instructions: "Проверка\n" + "😀".repeat(1100), messages: [{ role: "user", text: "hello" }] };
+  await recorder.operation("model.call", async () => { new DebugContentRecorder(recorder).record("request", request); });
+  await publisher.drain();
+  const chunks = events.slice(contentStart).filter(event => event.payload.operation === "detail.request");
+  if (chunks.length < 2 || chunks.some(event => (event.payload.content?.length ?? 0) > 1000)) throw new Error("Content was not chunked.");
+  if (JSON.stringify(JSON.parse(chunks.map(event => event.payload.content).join(""))) !== JSON.stringify(request)) throw new Error("Request content changed.");
+  const contract = new DebugEventContract(new JsonValueContract(), new ExecutionIdentityContract());
+  for (const event of chunks) if (!(await contract.validate(event)).valid) throw new Error("Captured content cannot cross the storage contract.");
   logging.setEnabled(false);
   logging.setLevel("error");
   const before = events.length;
