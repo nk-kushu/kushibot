@@ -9,4 +9,9 @@ export interface IAgentOptions<TTask, TResult> {
   readonly requestContract: IResultContract<TTask>;
   readonly workflow: IPolicy<IAgentSetupInput<TTask>, IAgentWorkflow<TResult>>;
   readonly runtime: AgentRuntimeFactory;
+  /**
+   * The run can wait for a human across processes. Its stored snapshot then has no absolute
+   * deadline, because waiting time is not working time; each process still gets its own.
+   */
+  readonly suspendable?: boolean;
 }

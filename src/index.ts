@@ -691,3 +691,17 @@ export { SqlFilesystemReceiptStore } from "./persistence/publication/SqlFilesyst
 export { LocalWorkspaceArtifacts } from "./workspaces/LocalWorkspaceArtifacts.js";
 export { LocalWorkspaceProposalService } from "./publication/LocalWorkspaceProposalService.js";
 export { LocalWorkspacePublicationService } from "./publication/LocalWorkspacePublicationService.js";
+
+// Human and external waits, focused sessions, skill scheduling and CLI execution.
+export { WorkflowRunResumption } from "./workflows/WorkflowRunResumption.js";
+export { WorkflowWait } from "./workflows/WorkflowWait.js";
+export { SqlAgentStoreFactory } from "./agents/SqlAgentStoreFactory.js";
+export type { SqlAgentStoreOptions } from "./agents/SqlAgentStoreFactory.js";
+export { AgentTaskExecutor } from "./executors/AgentTaskExecutor.js";
+export type { AgentModelBinding } from "./agents/AgentRunRuntime.js";
+export * from "./skills/SkillDescriptor.js";
+export * from "./skills/SkillSchedule.js";
+export * from "./skills/SkillScheduleOutcome.js";
+export { SkillDependencyGraph } from "./skills/SkillDependencyGraph.js";
+export { SkillScheduler } from "./skills/SkillScheduler.js";
+export * from "./tools/cli/CliExecution.js";

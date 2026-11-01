@@ -7,6 +7,7 @@ import { WorkflowDefinitionContract } from "../workflows/WorkflowDefinitionContr
 import { WorkflowRun } from "../workflows/WorkflowRun.js";
 import { WorkflowStepRunnerFactory } from "../workflows/WorkflowStepRunnerFactory.js";
 import { WorkflowEngine } from "../workflows/WorkflowEngine.js";
+import { WorkflowRunResumption } from "../workflows/WorkflowRunResumption.js";
 
 /** A reusable application boundary over the workflow engine; behavior is injected by composition. */
 export class Agent<TTask, TResult> {
@@ -39,10 +40,36 @@ export class Agent<TTask, TResult> {
    * result mapping, or collection of run evidence throws.
    */
   async run(task: TTask, controls: IAgentRunOptions = {}): Promise<IAgentRunResult<TResult>> {
+    return this.exclusive(() => this.execute(task, controls, null));
+  }
+
+  /**
+   * Reopens a run that returned `pending` because its work waits for something outside the
+   * process, usually a human answer. Starting another run is not a resume: this keeps the
+   * run's identity, attempts, transitions and usage, and needs the same durable stores and
+   * the same task and workflow as the original `run`.
+   *
+   * `resolvedRefs` must name exactly the run's pending operations; the host asserts by
+   * passing them that those operations are finished and will not be repeated.
+   *
+   * @throws If the run is unknown, is not suspended, or has other pending operations.
+   */
+  async resume(
+    runId: string,
+    task: TTask,
+    resolvedRefs: readonly string[],
+    controls: IAgentRunOptions = {},
+  ): Promise<IAgentRunResult<TResult>> {
+    return this.exclusive(() => this.execute(task, { ...controls, runId }, resolvedRefs));
+  }
+
+  private async exclusive(
+    work: () => Promise<IAgentRunResult<TResult>>,
+  ): Promise<IAgentRunResult<TResult>> {
     if (this.running) throw new Error("This agent is already running.");
     this.running = true;
     try {
-      return await this.execute(task, controls);
+      return await work();
     } finally {
       this.running = false;
     }
@@ -65,6 +92,7 @@ export class Agent<TTask, TResult> {
   private async execute(
     task: TTask,
     controls: IAgentRunOptions,
+    resolvedRefs: readonly string[] | null,
   ): Promise<IAgentRunResult<TResult>> {
     const json = new JsonValueContract();
     const checked = await this.options.requestContract.validate(task);
@@ -89,9 +117,11 @@ export class Agent<TTask, TResult> {
         request: request.value,
         completionPolicy: workflow.completionPolicy,
         budgetScopeId: runtime.budgetScopeId,
-        deadlineEpochMs: runtime.context.deadlineEpochMs,
+        deadlineEpochMs: this.options.suspendable ? null : runtime.context.deadlineEpochMs,
       }),
     );
+    if (resolvedRefs !== null)
+      await new WorkflowRunResumption(runtime.stores.workflow, runtime.ids).reopen(resolvedRefs);
     const runners = new WorkflowStepRunnerFactory(
       definitions,
       workflow.executors,

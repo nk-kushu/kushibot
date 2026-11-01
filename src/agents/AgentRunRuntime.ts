@@ -18,6 +18,12 @@ import { DebugRecordingModelGateway } from "./DebugRecordingModelGateway.js";
 import type { IScopedDebugRecorder } from "../events/debug/IScopedDebugRecorder.js";
 import { NoopDebugRecorder } from "../events/debug/NoopDebugRecorder.js";
 
+/** Replaces the run's model for one session; every model shares the run's budget. */
+export type AgentModelBinding = Readonly<{
+  gateway: IModelGateway;
+  profile: ModelProfile;
+}>;
+
 /** Per-run dependencies shared by all executors and sessions in an agent invocation. */
 export class AgentRunRuntime {
   constructor(
@@ -36,29 +42,38 @@ export class AgentRunRuntime {
   createTaskFactory<TResult>(
     result: IResultContract<TResult>,
     bindings: IPolicy<AgentTaskBindingRequest, IAgentSessionBinding<TResult>>,
+    model?: AgentModelBinding,
   ): SessionAgentTaskFactory<TResult> {
     return new SessionAgentTaskFactory(
-      new AgentTaskSessionProvider(this, bindings),
+      new AgentTaskSessionProvider(this, bindings, model),
       result,
       this.ids,
       this.debug,
     );
   }
-  createTurn(instructions: string, input: JsonValue): AgentModelTurn {
+  createTurn(instructions: string, input: JsonValue, model?: AgentModelBinding): AgentModelTurn {
     return new AgentModelTurn(
       instructions,
       input,
-      new BudgetedModelCall(
-        new DebugRecordingModelGateway(this.gateway, this.debug),
-        this.profile,
-        this.stores.usage,
-        this.budgetScopeId,
-        this.clock,
-        new ModelRequestValidator(),
-      ),
-      this.profile,
+      this.createModelCall(model),
+      model?.profile ?? this.profile,
       this.modelTimeoutMs,
       this.debug,
     );
+  }
+  /** A model call charged to this run, for work outside a session such as scheduling. */
+  createModelCall(model?: AgentModelBinding): BudgetedModelCall {
+    return new BudgetedModelCall(
+      new DebugRecordingModelGateway(model?.gateway ?? this.gateway, this.debug),
+      model?.profile ?? this.profile,
+      this.stores.usage,
+      this.budgetScopeId,
+      this.clock,
+      new ModelRequestValidator(),
+    );
+  }
+  /** What `createModelCall` needs alongside it to size and bound a request. */
+  modelLimits(model?: AgentModelBinding): Readonly<{ profile: ModelProfile; timeoutMs: number }> {
+    return { profile: model?.profile ?? this.profile, timeoutMs: this.modelTimeoutMs };
   }
 }

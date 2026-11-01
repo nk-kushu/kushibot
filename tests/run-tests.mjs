@@ -73,4 +73,10 @@ const { verifyAgents } = await import("../.test-build/tests/agents/Agent.test.js
 await verifyAgents();
 console.log("Generic agent composition checks passed.");
 
+const { checkAgentResume } = await import("../.test-build/tests/agents/checkAgentResume.js");
+await checkAgentResume();
+const { checkSkillScheduler } = await import("../.test-build/tests/skills/checkSkillScheduler.js");
+await checkSkillScheduler();
+console.log("Agent resume and skill scheduler checks passed.");
+
 await checkSharedInfrastructure();

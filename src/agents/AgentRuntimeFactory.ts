@@ -41,7 +41,7 @@ export class AgentRuntimeFactory {
     );
   }
   async create(agentId: string, controls: IAgentRunOptions = {}): Promise<AgentRunRuntime> {
-    const runId = this.ids.nextId(),
+    const runId = controls.runId ?? this.ids.nextId(),
       operationId = this.ids.nextId();
     if (
       !/^[A-Za-z0-9_.:-]{1,120}$/.test(runId) ||
@@ -54,7 +54,10 @@ export class AgentRuntimeFactory {
     });
     const signal = controls.signal ?? new AbortController().signal;
     signal.throwIfAborted();
-    const deadlineEpochMs = this.clock.nowEpochMs() + (this.options.timeoutMs ?? 600_000);
+    const timeoutMs = controls.timeoutMs ?? this.options.timeoutMs ?? 600_000;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647)
+      throw new Error("Invalid timeoutMs.");
+    const deadlineEpochMs = this.clock.nowEpochMs() + timeoutMs;
     const stores = await (this.options.stores ?? new InMemoryAgentStoreFactory()).create({
       runId,
       scope,

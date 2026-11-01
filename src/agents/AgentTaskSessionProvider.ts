@@ -4,7 +4,7 @@ import type { IExecutionContext } from "../executors/contracts/IExecutionContext
 import type { IResultContract } from "../contracts/validation/IResultContract.js";
 import type { IPolicy } from "../contracts/IPolicy.js";
 import type { IAgentSessionBinding } from "./IAgentSessionBinding.js";
-import type { AgentRunRuntime } from "./AgentRunRuntime.js";
+import type { AgentModelBinding, AgentRunRuntime } from "./AgentRunRuntime.js";
 import { AgenticSession } from "../agentic/sessions/AgenticSession.js";
 import { AgentActionParser } from "../agentic/sessions/AgentActionParser.js";
 import { JsonValueContract } from "../persistence/JsonValueContract.js";
@@ -14,6 +14,7 @@ export class AgentTaskSessionProvider<TResult> implements IAgentTaskSessionProvi
   constructor(
     private readonly runtime: AgentRunRuntime,
     private readonly bindings: IPolicy<AgentTaskBindingRequest, IAgentSessionBinding<TResult>>,
+    private readonly model?: AgentModelBinding,
   ) {}
   async create(
     request: AgentTaskBindingRequest,
@@ -27,7 +28,7 @@ export class AgentTaskSessionProvider<TResult> implements IAgentTaskSessionProvi
     const checked = await json.validate(binding.input);
     if (!checked.valid || !binding.instructions.trim())
       throw new Error("Invalid agent session binding.");
-    const turn = this.runtime.createTurn(binding.instructions, checked.value);
+    const turn = this.runtime.createTurn(binding.instructions, checked.value, this.model);
     this.runtime.debug.event("progress.reported", "debug", {
       operation: "agent.session",
       relatedRefs: [

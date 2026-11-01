@@ -20,7 +20,7 @@ export class WorkflowDefinitionContract implements IResultContract<WorkflowDefin
          row.transitions.length > 32 ||
          !Number.isSafeInteger(row.maxTotalAttempts) ||
          (row.maxTotalAttempts as number) < row.steps.length ||
-         (row.maxTotalAttempts as number) > 128) return this.invalid();
+         (row.maxTotalAttempts as number) > 1024) return this.invalid();
     for (const step of row.steps) if (!this.object(step) ||
          !this.keys(step,["id","dependencies","executor","inputPolicy","acceptancePolicy","maxAttempts"]) ||
          !this.validId(step.id) ||
@@ -33,7 +33,7 @@ export class WorkflowDefinitionContract implements IResultContract<WorkflowDefin
          !this.reference(step.acceptancePolicy) ||
          !Number.isSafeInteger(step.maxAttempts) ||
          (step.maxAttempts as number) < 1 ||
-         (step.maxAttempts as number) > 8) return this.invalid();
+         (step.maxAttempts as number) > 64) return this.invalid();
     const definition = checked.value as unknown as WorkflowDefinition;
     const ids = new Set(definition.steps.map(step => step.id));
     if (ids.size !== definition.steps.length || definition.steps.some(step => step.dependencies.some(id => !ids.has(id) || id === step.id))) return this.invalid();
@@ -50,7 +50,7 @@ export class WorkflowDefinitionContract implements IResultContract<WorkflowDefin
          !this.reference(transition.policy) ||
          !Number.isSafeInteger(transition.maxTraversals) ||
          (transition.maxTraversals as number) < 1 ||
-         (transition.maxTraversals as number) > 8) return this.invalid();
+         (transition.maxTraversals as number) > 64) return this.invalid();
       transitionIds.add(transition.id as string);
     }
     return { valid: true, value: definition };
